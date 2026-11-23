@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-export type ApplicationStatus = 'Envoyée' | 'En cours' | 'Entretien';
+export type ApplicationStatus = 'Envoyée' | 'En cours' | 'Entretien' | 'Offre';
 
 export interface JobApplication {
   jobId: string;
@@ -22,6 +22,7 @@ interface JobsContextValue {
   applications: Record<string, JobApplication>;
   toggleSave: (id: string) => boolean;
   markApplied: (id: string, details?: { cvName?: string; note?: string }) => void;
+  updateApplicationStatus: (id: string, status: ApplicationStatus) => void;
   withdrawApplication: (id: string) => void;
   isSaved: (id: string) => boolean;
   isApplied: (id: string) => boolean;
@@ -92,6 +93,22 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     [savedIds, persist]
   );
 
+  const updateApplicationStatus = useCallback(
+    (id: string, status: ApplicationStatus) => {
+      setApplications((prev) => {
+        const existing = prev[id];
+        if (!existing) return prev;
+        const next: Record<string, JobApplication> = {
+          ...prev,
+          [id]: { ...existing, status },
+        };
+        persist(savedIds, next);
+        return next;
+      });
+    },
+    [savedIds, persist]
+  );
+
   const withdrawApplication = useCallback(
     (id: string) => {
       setApplications((prev) => {
@@ -118,6 +135,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         applications,
         toggleSave,
         markApplied,
+        updateApplicationStatus,
         withdrawApplication,
         isSaved,
         isApplied,

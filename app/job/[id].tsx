@@ -40,6 +40,7 @@ import { useJobs } from '@/context/jobs-context';
 import { useProfile } from '@/context/profile-context';
 import { JOBS, type JobBenefit, type JobQualification } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
+import { computeJobMatch } from '@/lib/job-match';
 
 const QUALIFICATION_ICON_MAP: Record<JobQualification['icon'], typeof Award> = {
   award: Award,
@@ -63,6 +64,10 @@ export default function JobDetailScreen() {
   const { profile } = useProfile();
 
   const job = JOBS.find((item) => item.id === id) ?? JOBS[0];
+  const match = computeJobMatch(job, profile);
+  const similarJobs = JOBS.filter(
+    (item) => item.id !== job.id && item.category === job.category
+  ).slice(0, 3);
   const saved = isSaved(job.id);
   const applied = isApplied(job.id);
 
@@ -157,6 +162,22 @@ export default function JobDetailScreen() {
         showsVerticalScrollIndicator={false}>
         {/* 0: Hero Card */}
         <JobHeroCard job={job} />
+
+        {/* Match Score Banner */}
+        <Box className="mb-3 px-4">
+          <Box className="bg-primary-fixed/60 border-primary/20 rounded-xl border px-3.5 py-2.5">
+            <HStack className="items-center justify-between" space="sm">
+              <Text size="xs" bold className="text-on-primary-fixed">
+                Compatibilité : {match.score}% Match
+              </Text>
+              {match.reasons.length > 0 && (
+                <Text size="2xs" isTruncated className="text-muted-foreground flex-1 text-right">
+                  {match.reasons.join(' • ')}
+                </Text>
+              )}
+            </HStack>
+          </Box>
+        </Box>
 
         {/* 1: Key Metrics Pills */}
         <JobMetricsRow metrics={job.metrics} />
@@ -390,6 +411,38 @@ export default function JobDetailScreen() {
             )}
           </VStack>
         </Animated.View>
+
+        {/* Similar Jobs */}
+        {similarJobs.length > 0 && (
+          <VStack space="sm" className="px-4 pt-6">
+            <Heading size="sm" bold className="text-foreground">
+              Offres similaires en {job.category}
+            </Heading>
+            <VStack space="sm">
+              {similarJobs.map((item) => (
+                <Card key={item.id} className="bg-card border-border rounded-2xl border p-3.5">
+                  <HStack className="items-center justify-between" space="sm">
+                    <VStack className="min-w-0 flex-1">
+                      <Text size="sm" bold isTruncated className="text-foreground">
+                        {item.title}
+                      </Text>
+                      <Text size="xs" isTruncated className="text-muted-foreground">
+                        {item.company} • {item.salaryRange}
+                      </Text>
+                    </VStack>
+                    <Text
+                      size="xs"
+                      bold
+                      onPress={() => router.push(`/job/${item.id}`)}
+                      className="text-primary px-2 py-1">
+                      Voir →
+                    </Text>
+                  </HStack>
+                </Card>
+              ))}
+            </VStack>
+          </VStack>
+        )}
       </ScrollView>
 
       <JobApplyBar

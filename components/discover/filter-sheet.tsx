@@ -1,0 +1,240 @@
+import React from 'react';
+import { Modal, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BellPlus, Clock, SlidersHorizontal, Trash2, X } from 'lucide-react-native';
+import { Box } from '@/components/ui/box';
+import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
+import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
+import { Pressable } from '@/components/ui/pressable';
+import { ScrollView } from '@/components/ui/scroll-view';
+import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
+import type { JobAlert, WorkMode } from '@/context/profile-context';
+import { triggerHaptic } from '@/lib/haptics';
+
+const WORK_MODE_FILTERS: (WorkMode | 'Tous')[] = ['Tous', 'Télétravail', 'Hybride', 'Présentiel'];
+
+const SALARY_FILTERS = [0, 70, 100, 130];
+
+interface FilterSheetProps {
+  visible: boolean;
+  workMode: WorkMode | 'Tous';
+  minSalaryK: number;
+  recentSearches: string[];
+  savedAlerts: JobAlert[];
+  onChangeWorkMode: (mode: WorkMode | 'Tous') => void;
+  onChangeMinSalary: (salary: number) => void;
+  onSelectSearch: (term: string) => void;
+  onClearSearches: () => void;
+  onCreateAlert: () => void;
+  onRemoveAlert: (id: string) => void;
+  onReset: () => void;
+  onClose: () => void;
+}
+
+export function FilterSheet({
+  visible,
+  workMode,
+  minSalaryK,
+  recentSearches,
+  savedAlerts,
+  onChangeWorkMode,
+  onChangeMinSalary,
+  onSelectSearch,
+  onClearSearches,
+  onCreateAlert,
+  onRemoveAlert,
+  onReset,
+  onClose,
+}: FilterSheetProps) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Box className="flex-1 justify-end">
+        <Pressable onPress={onClose} className="bg-foreground/45 absolute inset-0" />
+
+        <Box
+          className="bg-card border-border max-h-[82%] rounded-t-3xl border-t px-5 pt-4"
+          style={{
+            paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 20),
+          }}>
+          <VStack space="md">
+            <Box className="bg-border h-1 w-10 self-center rounded-full" />
+
+            <HStack className="items-center justify-between">
+              <HStack className="items-center" space="xs">
+                <Icon as={SlidersHorizontal} size="sm" className="text-primary" />
+                <Heading size="md" bold className="text-foreground">
+                  Filtres & Alertes
+                </Heading>
+              </HStack>
+
+              <HStack className="items-center" space="sm">
+                <Pressable onPress={onReset}>
+                  <Text size="xs" bold className="text-primary">
+                    Réinitialiser
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Fermer"
+                  onPress={onClose}
+                  className="bg-muted h-8 w-8 items-center justify-center rounded-full">
+                  <Icon as={X} size="sm" className="text-muted-foreground" />
+                </Pressable>
+              </HStack>
+            </HStack>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <VStack space="md" className="pb-2">
+                {/* Work Mode */}
+                <VStack space="xs">
+                  <Text size="xs" bold className="text-foreground">
+                    Mode de travail
+                  </Text>
+                  <HStack className="flex-wrap gap-2">
+                    {WORK_MODE_FILTERS.map((mode) => {
+                      const active = workMode === mode;
+                      return (
+                        <Pressable
+                          key={mode}
+                          onPress={() => {
+                            triggerHaptic('light');
+                            onChangeWorkMode(mode);
+                          }}
+                          className={`rounded-full border px-3.5 py-2 ${
+                            active
+                              ? 'bg-primary-fixed border-primary'
+                              : 'bg-background border-border'
+                          }`}>
+                          <Text
+                            size="xs"
+                            bold={active}
+                            className={active ? 'text-primary' : 'text-muted-foreground'}>
+                            {mode}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </HStack>
+                </VStack>
+
+                {/* Minimum Salary */}
+                <VStack space="xs">
+                  <Text size="xs" bold className="text-foreground">
+                    Salaire annuel minimum
+                  </Text>
+                  <HStack className="flex-wrap gap-2">
+                    {SALARY_FILTERS.map((salary) => {
+                      const active = minSalaryK === salary;
+                      return (
+                        <Pressable
+                          key={salary}
+                          onPress={() => {
+                            triggerHaptic('light');
+                            onChangeMinSalary(salary);
+                          }}
+                          className={`rounded-full border px-3.5 py-2 ${
+                            active
+                              ? 'bg-secondary-container/60 border-secondary'
+                              : 'bg-background border-border'
+                          }`}>
+                          <Text
+                            size="xs"
+                            bold={active}
+                            className={
+                              active ? 'text-on-secondary-container' : 'text-muted-foreground'
+                            }>
+                            {salary === 0 ? 'Tous salaires' : `${salary}k+ €`}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </HStack>
+                </VStack>
+
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && (
+                  <VStack space="xs">
+                    <HStack className="items-center justify-between">
+                      <HStack className="items-center" space="xs">
+                        <Icon as={Clock} size="xs" className="text-muted-foreground" />
+                        <Text size="xs" bold className="text-foreground">
+                          Recherches récentes
+                        </Text>
+                      </HStack>
+                      <Pressable onPress={onClearSearches}>
+                        <Text size="xs" className="text-primary">
+                          Effacer
+                        </Text>
+                      </Pressable>
+                    </HStack>
+
+                    <HStack className="flex-wrap gap-2">
+                      {recentSearches.map((term) => (
+                        <Pressable
+                          key={term}
+                          onPress={() => {
+                            triggerHaptic('light');
+                            onSelectSearch(term);
+                            onClose();
+                          }}
+                          className="bg-muted rounded-full px-3 py-1.5">
+                          <Text size="xs" className="text-foreground">
+                            {term}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </HStack>
+                  </VStack>
+                )}
+
+                {/* Saved Alerts */}
+                {savedAlerts.length > 0 && (
+                  <VStack space="xs">
+                    <Text size="xs" bold className="text-foreground">
+                      Alertes actives ({savedAlerts.length})
+                    </Text>
+                    <VStack space="xs">
+                      {savedAlerts.map((alert) => (
+                        <Box key={alert.id} className="bg-muted rounded-xl px-3 py-2">
+                          <HStack className="items-center justify-between">
+                            <VStack className="flex-1">
+                              <Text size="xs" bold className="text-foreground">
+                                {alert.query}
+                              </Text>
+                              <Text size="2xs" className="text-muted-foreground">
+                                {alert.workMode ?? 'Tous modes'}
+                                {alert.minSalaryK ? ` • ${alert.minSalaryK}k+ €` : ''}
+                              </Text>
+                            </VStack>
+                            <Pressable onPress={() => onRemoveAlert(alert.id)} className="p-1.5">
+                              <Icon as={Trash2} size="xs" className="text-destructive" />
+                            </Pressable>
+                          </HStack>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </VStack>
+                )}
+              </VStack>
+            </ScrollView>
+
+            {/* Footer Buttons */}
+            <HStack space="sm">
+              <Button variant="outline" size="lg" onPress={onCreateAlert} className="rounded-xl">
+                <ButtonIcon as={BellPlus} />
+                <ButtonText>Créer alerte</ButtonText>
+              </Button>
+              <Button size="lg" onPress={onClose} className="flex-1 rounded-xl">
+                <ButtonText className="font-bold">Voir les offres</ButtonText>
+              </Button>
+            </HStack>
+          </VStack>
+        </Box>
+      </Box>
+    </Modal>
+  );
+}

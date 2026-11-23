@@ -15,7 +15,9 @@ export default function TabsLayout() {
     <NativeTabs
       tintColor={colors.primary}
       backgroundColor={Platform.OS === 'android' ? colors.card : undefined}
-      blurEffect={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+      blurEffect={
+        isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'
+      }
       minimizeBehavior="onScrollDown"
       indicatorColor={isDark ? '#0D253F' : '#DDE1FF'}
       iconColor={{
@@ -25,15 +27,14 @@ export default function TabsLayout() {
       labelStyle={{
         default: { color: colors.mutedForeground },
         selected: { color: colors.primary, fontWeight: '600' },
-      }}>
+      }}
+    >
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Icon sf={{ default: 'safari', selected: 'safari.fill' }} md="explore" />
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'safari', selected: 'safari.fill' }}
+          md="explore"
+        />
         <NativeTabs.Trigger.Label>Découvrir</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="search" role="search">
-        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
-        <NativeTabs.Trigger.Label>Recherche</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="saved">
@@ -43,7 +44,9 @@ export default function TabsLayout() {
         />
         <NativeTabs.Trigger.Label>Favoris</NativeTabs.Trigger.Label>
         {savedIds.length > 0 && (
-          <NativeTabs.Trigger.Badge>{String(savedIds.length)}</NativeTabs.Trigger.Badge>
+          <NativeTabs.Trigger.Badge>
+            {String(savedIds.length)}
+          </NativeTabs.Trigger.Badge>
         )}
       </NativeTabs.Trigger>
 
@@ -54,7 +57,9 @@ export default function TabsLayout() {
         />
         <NativeTabs.Trigger.Label>Candidatures</NativeTabs.Trigger.Label>
         {appliedIds.length > 0 && (
-          <NativeTabs.Trigger.Badge>{String(appliedIds.length)}</NativeTabs.Trigger.Badge>
+          <NativeTabs.Trigger.Badge>
+            {String(appliedIds.length)}
+          </NativeTabs.Trigger.Badge>
         )}
       </NativeTabs.Trigger>
 

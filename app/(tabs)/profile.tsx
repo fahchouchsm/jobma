@@ -34,6 +34,7 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { JobmaHeader } from '@/components/jobma-header';
+import { AnimatedProgressBar } from '@/components/animated/animated-progress';
 import { useJobs } from '@/context/jobs-context';
 import { useProfile } from '@/context/profile-context';
 import { USER_PROFILE_AVATAR } from '@/data/jobs';
@@ -94,6 +95,17 @@ export default function ProfileScreen() {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  const completenessChecks = [
+    profile.fullName.trim().length > 1,
+    profile.domains.length > 0,
+    profile.skills.length > 0,
+    Boolean(profile.cvFile),
+    Boolean(profile.linkedinUrl || profile.portfolioUrl),
+  ];
+  const completenessPct = Math.round(
+    (completenessChecks.filter(Boolean).length / completenessChecks.length) * 100
+  );
 
   const toggleTheme = () => {
     triggerHaptic('light');
@@ -195,6 +207,28 @@ export default function ProfileScreen() {
                       </Text>
                     </HStack>
                   </Box>
+                )}
+              </VStack>
+            </Card>
+
+            {/* Profile Completeness */}
+            <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+              <VStack space="xs">
+                <HStack className="items-center justify-between">
+                  <Text size="xs" bold className="text-foreground">
+                    Complétude du profil
+                  </Text>
+                  <Text size="xs" bold className="text-primary">
+                    {completenessPct}%
+                  </Text>
+                </HStack>
+                <AnimatedProgressBar progress={completenessPct} />
+                {completenessPct < 100 && (
+                  <Text size="2xs" className="text-muted-foreground pt-0.5">
+                    {!profile.cvFile
+                      ? 'Astuce : importez votre CV pour atteindre 100% et postuler plus vite.'
+                      : 'Ajoutez un lien LinkedIn ou Portfolio pour compléter votre profil.'}
+                  </Text>
                 )}
               </VStack>
             </Card>
