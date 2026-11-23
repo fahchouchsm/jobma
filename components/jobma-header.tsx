@@ -50,7 +50,7 @@ export function JobmaHeader({
             <Text size="lg" bold className="text-primary tracking-tight">
               Jobma
             </Text>
-            <Text size="md" className="text-border">
+            <Text size="md" className="text-muted-foreground/50">
               •
             </Text>
             <Heading size="sm" bold isTruncated className="text-foreground flex-1">

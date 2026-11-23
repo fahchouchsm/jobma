@@ -78,9 +78,10 @@ export function JobmaTabBar({ state, descriptors, emitter, navigateToTab }: Bott
               className="flex-1 items-center justify-center py-1 active:opacity-80">
               <VStack className="items-center" space="xs">
                 <Box
-                  className={`relative h-8 items-center justify-center rounded-2xl px-4 ${
+                  className={`relative h-8 min-w-14 items-center justify-center overflow-hidden rounded-full px-4 ${
                     isFocused ? 'bg-primary-fixed' : 'bg-transparent'
-                  }`}>
+                  }`}
+                  style={{ borderRadius: 999 }}>
                   <Icon
                     as={config.icon}
                     size="md"
