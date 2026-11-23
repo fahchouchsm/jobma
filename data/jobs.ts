@@ -31,7 +31,8 @@ export interface JobListing {
   title: string;
   company: string;
   industry: string;
-  logoUrl: string;
+  logoUrl?: string;
+  brandTone: 'primary' | 'secondary' | 'tertiary';
   isActivelyHiring: boolean;
   workMode: 'Télétravail' | 'Hybride' | 'Présentiel';
   location: string;
@@ -55,8 +56,8 @@ export interface JobListing {
     stage: string;
     hq: string;
   };
-  officePhotoUrl: string;
-  officePhotoCaption: string;
+  officePhotoUrl?: string;
+  officePhotoCaption?: string;
   category: 'Design' | 'Engineering' | 'Product' | 'IA & Data';
 }
 
@@ -69,6 +70,7 @@ export const JOBS: JobListing[] = [
     title: 'Senior Product Designer',
     company: 'Stripe',
     industry: 'FinTech & Paiements',
+    brandTone: 'primary',
     logoUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCSvxizsZc2Y4fkZOCSM-D8f6_t06dwTYF8dsgXeXmQChuE1JGPlYy5-I_TbHdr_ADVpn-IqPQaQjHVA0Hu6YRrkgMDguHHDtZ5qK-RdiINKlXD2EueCz6O16BtR3Ys98ve05m2QYtaQgRSKLppIDOV6B1u76YUYwy08lqougqFeVht3hOGuswibLF2G_5NVmdU4V1paR_dKueUaWVdRBtoREe4YZmUdTqSMNX1M14',
     isActivelyHiring: true,
@@ -207,8 +209,7 @@ export const JOBS: JobListing[] = [
     title: 'Staff Frontend Engineer',
     company: 'Alan',
     industry: 'InsurTech & Santé',
-    logoUrl:
-      'https://ui-avatars.com/api/?name=Alan&background=1E40AF&color=ffffff&size=128&bold=true',
+    brandTone: 'primary',
     isActivelyHiring: true,
     workMode: 'Télétravail',
     location: 'Paris / Full Remote',
@@ -297,8 +298,7 @@ export const JOBS: JobListing[] = [
     title: 'Lead Mobile Engineer (React Native)',
     company: 'Qonto',
     industry: 'FinTech & Pro Banking',
-    logoUrl:
-      'https://ui-avatars.com/api/?name=Qonto&background=00288E&color=ffffff&size=128&bold=true',
+    brandTone: 'tertiary',
     isActivelyHiring: true,
     workMode: 'Hybride',
     location: 'Paris (2j remote)',
@@ -380,8 +380,7 @@ export const JOBS: JobListing[] = [
     title: 'Product Manager — Plateforme IA',
     company: 'Mistral AI',
     industry: 'Intelligence Artificielle',
-    logoUrl:
-      'https://ui-avatars.com/api/?name=Mistral&background=006C49&color=ffffff&size=128&bold=true',
+    brandTone: 'secondary',
     isActivelyHiring: false,
     workMode: 'Présentiel',
     location: 'Paris 1er',
