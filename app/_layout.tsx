@@ -5,7 +5,11 @@ import { ThemeProvider } from 'expo-router/react-navigation';
 import { PortalHost } from '@rn-primitives/portal';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useUniwind } from 'uniwind';
+import { Uniwind, useUniwind } from 'uniwind';
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { SafeAreaListener } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { JobsProvider } from '@/context/jobs-context';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -14,12 +18,24 @@ export {
 
 export default function RootLayout() {
   const { theme } = useUniwind();
+  const activeMode = theme === 'dark' ? 'dark' : 'light';
 
   return (
-    <ThemeProvider value={NAV_THEME[theme ?? 'light']}>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      <Stack />
-      <PortalHost />
-    </ThemeProvider>
+    <SafeAreaListener
+      onChange={({ insets }) => {
+        Uniwind.updateInsets(insets);
+      }}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <GluestackUIProvider mode={activeMode}>
+          <JobsProvider>
+            <ThemeProvider value={NAV_THEME[activeMode]}>
+              <StatusBar style={activeMode === 'dark' ? 'light' : 'dark'} />
+              <Stack screenOptions={{ headerShown: false }} />
+              <PortalHost />
+            </ThemeProvider>
+          </JobsProvider>
+        </GluestackUIProvider>
+      </GestureHandlerRootView>
+    </SafeAreaListener>
   );
 }
