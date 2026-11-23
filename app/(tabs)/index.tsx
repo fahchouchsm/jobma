@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { JobCard } from '@/components/job-card';
 import { JobmaHeader } from '@/components/jobma-header';
 import { useJobs } from '@/context/jobs-context';
+import { useProfile } from '@/context/profile-context';
 import { JOBS, type JobListing } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -33,6 +34,9 @@ export default function JobDiscoveryScreen() {
   const router = useRouter();
   const toast = useToast();
   const { isSaved, isApplied, toggleSave, savedIds } = useJobs();
+  const { profile } = useProfile();
+
+  const firstName = profile.fullName.trim().split(' ')[0] || 'Sarah';
 
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterChip>('Toutes');
@@ -95,10 +99,12 @@ export default function JobDiscoveryScreen() {
               </Box>
             </HStack>
             <Heading size="2xl" bold className="text-foreground tracking-tight">
-              Bonjour Sarah
+              Bonjour {firstName}
             </Heading>
             <Text size="sm" className="text-muted-foreground">
-              Salaires transparents et candidature en 1 clic.
+              {profile.domains.length > 0
+                ? `Sélection ${profile.domains.join(' • ')} • ${profile.minSalaryK}k+ €`
+                : 'Salaires transparents et candidature en 1 clic.'}
             </Text>
           </VStack>
 

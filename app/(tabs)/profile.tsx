@@ -1,46 +1,85 @@
 import React from 'react';
+import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { Uniwind, useUniwind } from 'uniwind';
 import {
+  Banknote,
   Bookmark,
   Briefcase,
   CheckCircle2,
+  FileText,
+  Globe,
   MapPin,
   MoonStar,
+  RotateCcw,
   Sparkles,
   Sun,
+  UploadCloud,
 } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
-import { VStack } from '@/components/ui/vstack';
-import { HStack } from '@/components/ui/hstack';
+import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import { Text } from '@/components/ui/text';
+import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
 import { Pressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
-import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { JobmaHeader } from '@/components/jobma-header';
-import { USER_PROFILE_AVATAR } from '@/data/jobs';
 import { useJobs } from '@/context/jobs-context';
-
-const SKILLS = [
-  'Product Design',
-  'Design Systems',
-  'Figma',
-  'React Native',
-  'Prototypage',
-  'User Research',
-];
+import { useProfile } from '@/context/profile-context';
+import { USER_PROFILE_AVATAR } from '@/data/jobs';
+import { triggerHaptic } from '@/lib/haptics';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { theme } = useUniwind();
   const { savedIds, appliedIds } = useJobs();
+  const { profile, updateProfile, resetOnboarding } = useProfile();
   const isDark = theme === 'dark';
 
+  const initials = (profile.fullName || 'JM')
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   const toggleTheme = () => {
+    triggerHaptic('light');
     Uniwind.setTheme(isDark ? 'light' : 'dark');
+  };
+
+  const handlePickCv = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ],
+      copyToCacheDirectory: true,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      triggerHaptic('success');
+      updateProfile({
+        cvFile: {
+          name: asset.name,
+          size: asset.size,
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+        },
+      });
+    }
+  };
+
+  const handleRelaunchOnboarding = async () => {
+    triggerHaptic('light');
+    await resetOnboarding();
+    router.replace('/onboarding');
   };
 
   return (
@@ -57,33 +96,95 @@ export default function ProfileScreen() {
             <VStack space="md">
               <HStack className="items-center" space="md">
                 <Avatar className="border-primary/20 h-16 w-16 border-2">
-                  <AvatarFallbackText>SM</AvatarFallbackText>
+                  <AvatarFallbackText>{initials}</AvatarFallbackText>
                   <AvatarImage source={{ uri: USER_PROFILE_AVATAR }} />
                 </Avatar>
                 <VStack space="xs" className="flex-1">
                   <Heading size="lg" bold className="text-foreground">
-                    Sarah Martin
+                    {profile.fullName}
                   </Heading>
                   <Text size="sm" className="text-muted-foreground">
-                    Senior Product Designer
+                    {profile.headline} • {profile.experienceLevel}
                   </Text>
                   <HStack className="items-center" space="xs">
                     <Icon as={MapPin} size="xs" className="text-primary" />
                     <Text size="xs" className="text-muted-foreground">
-                      Paris • Ouverte au télétravail
+                      {profile.location}
                     </Text>
                   </HStack>
                 </VStack>
               </HStack>
 
-              <Box className="bg-secondary-container/50 rounded-xl px-3 py-2">
+              <HStack className="flex-wrap gap-2">
+                <Box className="bg-secondary-container/50 rounded-full px-3 py-1.5">
+                  <HStack className="items-center" space="xs">
+                    <Icon as={Banknote} size="xs" className="text-secondary" />
+                    <Text size="xs" bold className="text-on-secondary-container">
+                      {profile.minSalaryK}k+ € / an
+                    </Text>
+                  </HStack>
+                </Box>
+
+                {profile.workModes.length > 0 && (
+                  <Box className="bg-muted rounded-full px-3 py-1.5">
+                    <HStack className="items-center" space="xs">
+                      <Icon as={Globe} size="xs" className="text-primary" />
+                      <Text size="xs" className="text-foreground font-medium">
+                        {profile.workModes.join(', ')}
+                      </Text>
+                    </HStack>
+                  </Box>
+                )}
+              </HStack>
+
+              {profile.oneClickApplyEnabled && (
+                <Box className="bg-secondary-container/50 rounded-xl px-3 py-2">
+                  <HStack className="items-center" space="xs">
+                    <Icon as={CheckCircle2} size="sm" className="text-secondary" />
+                    <Text size="xs" bold className="text-on-secondary-container">
+                      Profil prêt pour la candidature en 1 clic
+                    </Text>
+                  </HStack>
+                </Box>
+              )}
+            </VStack>
+          </Card>
+
+          {/* CV Card */}
+          <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+            <VStack space="sm">
+              <HStack className="items-center justify-between">
                 <HStack className="items-center" space="xs">
-                  <Icon as={CheckCircle2} size="sm" className="text-secondary" />
-                  <Text size="xs" bold className="text-on-secondary-container">
-                    Profil prêt pour la candidature en 1 clic
-                  </Text>
+                  <Icon as={FileText} size="sm" className="text-primary" />
+                  <Heading size="sm" bold className="text-foreground">
+                    Mon CV
+                  </Heading>
                 </HStack>
-              </Box>
+                <Pressable onPress={handlePickCv}>
+                  <Text size="xs" bold className="text-primary">
+                    {profile.cvFile ? 'Remplacer' : 'Importer'}
+                  </Text>
+                </Pressable>
+              </HStack>
+
+              {profile.cvFile ? (
+                <HStack className="bg-muted items-center rounded-xl p-3" space="sm">
+                  <Icon as={FileText} size="md" className="text-secondary" />
+                  <VStack className="min-w-0 flex-1">
+                    <Text size="xs" bold isTruncated className="text-foreground">
+                      {profile.cvFile.name}
+                    </Text>
+                    <Text size="2xs" className="text-muted-foreground">
+                      Utilisé automatiquement pour 1-clic
+                    </Text>
+                  </VStack>
+                </HStack>
+              ) : (
+                <Button variant="outline" size="sm" onPress={handlePickCv}>
+                  <ButtonIcon as={UploadCloud} />
+                  <ButtonText>Importer un CV (PDF, DOCX)</ButtonText>
+                </Button>
+              )}
             </VStack>
           </Card>
 
@@ -134,7 +235,7 @@ export default function ProfileScreen() {
                 </Heading>
               </HStack>
               <HStack className="flex-wrap gap-2">
-                {SKILLS.map((skill) => (
+                {profile.skills.map((skill) => (
                   <Box key={skill} className="bg-muted rounded-full px-3 py-1.5">
                     <Text size="xs" className="text-foreground font-medium">
                       {skill}
@@ -158,7 +259,7 @@ export default function ProfileScreen() {
                       Apparence
                     </Text>
                     <Text size="xs" className="text-muted-foreground">
-                      {isDark ? 'Mode sombre actif' : 'Mode clair JobPulse actif'}
+                      {isDark ? 'Mode sombre Instagram actif' : 'Mode clair JobPulse actif'}
                     </Text>
                   </VStack>
                 </HStack>
@@ -171,6 +272,16 @@ export default function ProfileScreen() {
               </HStack>
             </Card>
           </Pressable>
+
+          {/* Relaunch Onboarding */}
+          <Button
+            variant="outline"
+            size="lg"
+            onPress={handleRelaunchOnboarding}
+            className="rounded-xl">
+            <ButtonIcon as={RotateCcw} />
+            <ButtonText>Modifier mon profil & CV</ButtonText>
+          </Button>
         </VStack>
       </ScrollView>
     </Box>

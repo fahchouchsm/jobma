@@ -35,6 +35,7 @@ import { JobMetricsRow } from '@/components/job-detail/job-metrics-row';
 import { type JobDetailTabId, JobSegmentedTabs } from '@/components/job-detail/job-segmented-tabs';
 import { JobmaHeader } from '@/components/jobma-header';
 import { useJobs } from '@/context/jobs-context';
+import { useProfile } from '@/context/profile-context';
 import { JOBS, type JobBenefit, type JobQualification } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -57,6 +58,7 @@ export default function JobDetailScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { isSaved, isApplied, toggleSave, markApplied } = useJobs();
+  const { profile } = useProfile();
 
   const job = JOBS.find((item) => item.id === id) ?? JOBS[0];
   const saved = isSaved(job.id);
@@ -113,7 +115,11 @@ export default function JobDetailScreen() {
       setIsApplying(false);
       markApplied(job.id);
       triggerHaptic('success');
-      showToast(`Postulé ! L'équipe ${job.company} a été notifiée.`);
+      showToast(
+        profile.cvFile
+          ? `Postulé avec ${profile.cvFile.name} !`
+          : `Postulé ! L'équipe ${job.company} a été notifiée.`
+      );
     }, 900);
   };
 
