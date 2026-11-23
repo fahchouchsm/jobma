@@ -1,8 +1,12 @@
 import React from 'react';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { Compass, Send } from 'lucide-react-native';
+import { Compass, FileText, Send, Trash2 } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
+import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
+import { Pressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
@@ -11,10 +15,11 @@ import { JobCard } from '@/components/job-card';
 import { JobmaHeader } from '@/components/jobma-header';
 import { useJobs } from '@/context/jobs-context';
 import { JOBS } from '@/data/jobs';
+import { triggerHaptic } from '@/lib/haptics';
 
 export default function ApplicationsScreen() {
   const router = useRouter();
-  const { appliedIds, isSaved } = useJobs();
+  const { appliedIds, applications, isSaved, withdrawApplication } = useJobs();
 
   const appliedJobs = JOBS.filter((job) => appliedIds.includes(job.id));
 
@@ -48,16 +53,47 @@ export default function ApplicationsScreen() {
             />
           ) : (
             <VStack space="md">
-              {appliedJobs.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  variant="applied"
-                  isSaved={isSaved(job.id)}
-                  isApplied
-                  onPress={() => router.push(`/job/${job.id}`)}
-                />
-              ))}
+              {appliedJobs.map((job, index) => {
+                const appInfo = applications[job.id];
+                return (
+                  <Animated.View
+                    key={job.id}
+                    entering={FadeInDown.delay(index * 60).duration(280)}
+                    layout={LinearTransition.springify()}>
+                    <VStack space="xs">
+                      <JobCard
+                        job={job}
+                        variant="applied"
+                        isSaved={isSaved(job.id)}
+                        isApplied
+                        onPress={() => router.push(`/job/${job.id}`)}
+                      />
+
+                      <HStack className="items-center justify-between px-2" space="sm">
+                        <HStack className="min-w-0 flex-1 items-center" space="xs">
+                          <Icon as={FileText} size="xs" className="text-muted-foreground" />
+                          <Text size="2xs" isTruncated className="text-muted-foreground">
+                            {appInfo?.cvName ? `CV : ${appInfo.cvName}` : 'Profil Jobma envoyé'}
+                            {appInfo?.note ? ` • « ${appInfo.note} »` : ''}
+                          </Text>
+                        </HStack>
+
+                        <Pressable
+                          onPress={() => {
+                            triggerHaptic('light');
+                            withdrawApplication(job.id);
+                          }}
+                          className="bg-muted flex-row items-center gap-1 rounded-full px-2 py-1">
+                          <Icon as={Trash2} size="xs" className="text-destructive" />
+                          <Text size="2xs" bold className="text-destructive">
+                            Retirer
+                          </Text>
+                        </Pressable>
+                      </HStack>
+                    </VStack>
+                  </Animated.View>
+                );
+              })}
             </VStack>
           )}
         </VStack>

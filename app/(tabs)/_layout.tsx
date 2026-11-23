@@ -31,6 +31,11 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Découvrir</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="search" role="search">
+        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
+        <NativeTabs.Trigger.Label>Recherche</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="saved">
         <NativeTabs.Trigger.Icon
           sf={{ default: 'bookmark', selected: 'bookmark.fill' }}

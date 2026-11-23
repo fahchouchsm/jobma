@@ -5,6 +5,7 @@ import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { PulseDot } from '@/components/animated/pulse-dot';
 
 interface StatusBadgeProps {
   variant: 'hiring' | 'applied' | 'salary' | 'workMode';
@@ -17,7 +18,7 @@ export function StatusBadge({ variant, label, icon }: StatusBadgeProps) {
     return (
       <Box className="bg-secondary-container/60 self-start rounded-full px-2.5 py-0.5">
         <HStack className="items-center" space="xs">
-          <Box className="bg-secondary h-1.5 w-1.5 rounded-full" />
+          <PulseDot />
           <Text size="2xs" bold className="text-on-secondary-container">
             {label ?? 'Recrutement actif'}
           </Text>

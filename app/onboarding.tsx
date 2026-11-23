@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Animated, { FadeInRight } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { OnboardingShell } from '@/components/onboarding/onboarding-shell';
 import { StepCv } from '@/components/onboarding/step-cv';
@@ -47,11 +48,13 @@ export default function OnboardingScreen() {
       onBack={handleBack}
       onNext={handleNext}
       onSkip={() => void handleFinish()}>
-      {step === 1 && <StepWelcome profile={profile} onChange={updateProfile} />}
-      {step === 2 && <StepDomain profile={profile} onChange={updateProfile} />}
-      {step === 3 && <StepPreferences profile={profile} onChange={updateProfile} />}
-      {step === 4 && <StepCv profile={profile} onChange={updateProfile} />}
-      {step === 5 && <StepSummary profile={profile} />}
+      <Animated.View key={step} entering={FadeInRight.duration(260)}>
+        {step === 1 && <StepWelcome profile={profile} onChange={updateProfile} />}
+        {step === 2 && <StepDomain profile={profile} onChange={updateProfile} />}
+        {step === 3 && <StepPreferences profile={profile} onChange={updateProfile} />}
+        {step === 4 && <StepCv profile={profile} onChange={updateProfile} />}
+        {step === 5 && <StepSummary profile={profile} />}
+      </Animated.View>
     </OnboardingShell>
   );
 }

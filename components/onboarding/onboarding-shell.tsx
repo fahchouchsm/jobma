@@ -10,6 +10,7 @@ import { Pressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { AnimatedProgressBar } from '@/components/animated/animated-progress';
 import { triggerHaptic } from '@/lib/haptics';
 
 interface OnboardingShellProps {
@@ -85,9 +86,7 @@ export function OnboardingShell({
           </HStack>
 
           {/* Progress Bar */}
-          <Box className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
-            <Box className="bg-primary h-full rounded-full" style={{ width: `${progressPct}%` }} />
-          </Box>
+          <AnimatedProgressBar progress={progressPct} />
         </VStack>
       </Box>
 

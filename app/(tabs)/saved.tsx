@@ -1,4 +1,5 @@
 import React from 'react';
+import Animated, { FadeInDown, FadeOutLeft, LinearTransition } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { Bookmark, Compass } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
@@ -48,16 +49,21 @@ export default function SavedJobsScreen() {
             />
           ) : (
             <VStack space="md">
-              {savedJobs.map((job) => (
-                <JobCard
+              {savedJobs.map((job, index) => (
+                <Animated.View
                   key={job.id}
-                  job={job}
-                  variant="saved"
-                  isSaved
-                  isApplied={isApplied(job.id)}
-                  onPress={() => router.push(`/job/${job.id}`)}
-                  onToggleSave={() => toggleSave(job.id)}
-                />
+                  entering={FadeInDown.delay(index * 60).duration(280)}
+                  exiting={FadeOutLeft.duration(220)}
+                  layout={LinearTransition.springify()}>
+                  <JobCard
+                    job={job}
+                    variant="saved"
+                    isSaved
+                    isApplied={isApplied(job.id)}
+                    onPress={() => router.push(`/job/${job.id}`)}
+                    onToggleSave={() => toggleSave(job.id)}
+                  />
+                </Animated.View>
               ))}
             </VStack>
           )}

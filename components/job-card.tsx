@@ -6,9 +6,9 @@ import { Divider } from '@/components/ui/divider';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
-import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { ScalePressable } from '@/components/animated/scale-pressable';
 import { CompanyLogo } from '@/components/company-logo';
 import { StatusBadge } from '@/components/status-badge';
 import { triggerHaptic } from '@/lib/haptics';
@@ -18,6 +18,7 @@ interface JobCardProps {
   job: JobListing;
   isSaved: boolean;
   isApplied: boolean;
+  matchScore?: number;
   variant?: 'discover' | 'saved' | 'applied';
   onPress: () => void;
   onToggleSave?: () => void;
@@ -27,6 +28,7 @@ export function JobCard({
   job,
   isSaved,
   isApplied,
+  matchScore,
   variant = 'discover',
   onPress,
   onToggleSave,
@@ -38,7 +40,7 @@ export function JobCard({
   };
 
   return (
-    <Pressable onPress={onPress} className="active:opacity-95">
+    <ScalePressable onPress={onPress} scaleTo={0.98}>
       <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
         <VStack space="sm">
           {/* Top Row: Company Logo + Title + Action */}
@@ -63,12 +65,13 @@ export function JobCard({
             </HStack>
 
             {onToggleSave && (
-              <Pressable
+              <ScalePressable
                 accessibilityLabel={
                   variant === 'saved' ? 'Retirer des favoris' : "Sauvegarder l'offre"
                 }
                 onPress={handleSavePress}
-                className="bg-muted h-9 w-9 items-center justify-center rounded-full active:opacity-80">
+                scaleTo={0.85}
+                className="bg-muted h-9 w-9 items-center justify-center rounded-full">
                 <Icon
                   as={variant === 'saved' ? Trash2 : Bookmark}
                   size="sm"
@@ -80,7 +83,7 @@ export function JobCard({
                         : 'text-muted-foreground'
                   }
                 />
-              </Pressable>
+              </ScalePressable>
             )}
           </HStack>
 
@@ -88,6 +91,13 @@ export function JobCard({
           <HStack className="flex-wrap items-center" space="sm">
             <StatusBadge variant="salary" label={job.salaryRange} />
             <StatusBadge variant="workMode" label={job.workMode} />
+            {matchScore !== undefined && matchScore >= 70 && (
+              <Box className="bg-primary-fixed self-start rounded-full px-2.5 py-1">
+                <Text size="xs" bold className="text-on-primary-fixed">
+                  {matchScore}% Match
+                </Text>
+              </Box>
+            )}
             {isApplied && <StatusBadge variant="applied" />}
           </HStack>
 
@@ -126,6 +136,6 @@ export function JobCard({
           </HStack>
         </VStack>
       </Card>
-    </Pressable>
+    </ScalePressable>
   );
 }

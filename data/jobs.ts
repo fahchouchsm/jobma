@@ -39,6 +39,7 @@ export interface JobListing {
   postedAgo: string;
   applicantsCount: string;
   salaryRange: string;
+  minSalaryK: number;
   contractType: string;
   level: string;
   metrics: JobMetric[];
@@ -79,6 +80,7 @@ export const JOBS: JobListing[] = [
     postedAgo: 'Publié il y a 2 jours',
     applicantsCount: 'Plus de 40 candidats',
     salaryRange: '150 000 € - 190 000 €/an',
+    minSalaryK: 150,
     contractType: 'Temps plein',
     level: 'Niveau Senior',
     category: 'Design',
@@ -216,6 +218,7 @@ export const JOBS: JobListing[] = [
     postedAgo: 'Publié il y a 1 jour',
     applicantsCount: '28 candidats',
     salaryRange: '115 000 € - 140 000 €/an',
+    minSalaryK: 115,
     contractType: 'Temps plein',
     level: 'Niveau Staff',
     category: 'Engineering',
@@ -305,6 +308,7 @@ export const JOBS: JobListing[] = [
     postedAgo: 'Publié il y a 3 jours',
     applicantsCount: '35 candidats',
     salaryRange: '95 000 € - 120 000 €/an',
+    minSalaryK: 95,
     contractType: 'Temps plein',
     level: 'Niveau Lead',
     category: 'Engineering',
@@ -387,6 +391,7 @@ export const JOBS: JobListing[] = [
     postedAgo: 'Publié il y a 5 jours',
     applicantsCount: '60+ candidats',
     salaryRange: '130 000 € - 165 000 €/an',
+    minSalaryK: 130,
     contractType: 'Temps plein',
     level: 'Niveau Senior',
     category: 'Product',
@@ -442,5 +447,287 @@ export const JOBS: JobListing[] = [
     officePhotoUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuBtLorA4KAmwVPhdVV13tg9Xem0edghSPyGQP5GjLzrg61ltelSE1NkyKS3e6s3rMdVdspjPayTHohSzLXXjddVJiq_lwMfOlsaWC0XilTBdpjSJuO0otvqbhLUmHppu8ezlR2oEulbMVfNDV-8bWVsz6J4jFBc715GGjzjw5JU4ai6RZQbllbFgruJ6m3M0iNTsBX6vrdJO8jpjd4Q3UEkt7-X8_3be5RW9XUgLrs',
     officePhotoCaption: 'Studio Mistral AI Paris',
+  },
+  {
+    id: 'doctolib-senior-product-designer',
+    title: 'Product Designer — Parcours Patients',
+    company: 'Doctolib',
+    industry: 'HealthTech',
+    brandTone: 'primary',
+    isActivelyHiring: true,
+    workMode: 'Hybride',
+    location: 'Levallois / Nantes',
+    postedAgo: 'Publié il y a 1 jour',
+    applicantsCount: '32 candidats',
+    salaryRange: '72 000 € - 90 000 €/an',
+    minSalaryK: 72,
+    contractType: 'Temps plein',
+    level: 'Niveau Senior',
+    category: 'Design',
+    metrics: [
+      {
+        id: 'salary',
+        label: '72 000 € - 90 000 €/an',
+        icon: 'payments',
+        tone: 'emerald',
+      },
+      { id: 'type', label: 'Temps plein', icon: 'schedule', tone: 'neutral' },
+      { id: 'level', label: 'Niveau Senior', icon: 'level', tone: 'neutral' },
+      { id: 'equity', label: 'BSPCE inclus', icon: 'equity', tone: 'indigo' },
+    ],
+    overview:
+      'Concevez des expériences de prise de rendez-vous et de téléconsultation accessibles à plus de 80 millions de patients en Europe.',
+    highlightTitle: 'Impact sociétal à grande échelle',
+    highlightSubtitle: 'Équipe Design de 45 personnes, Design System Oxygen.',
+    responsibilities: [
+      {
+        id: 'r1',
+        title: 'Accessibilité & Simplicité :',
+        description:
+          'Garantir des parcours mobiles utilisables par tous les publics, du premier accès jusqu’au suivi médical.',
+      },
+      {
+        id: 'r2',
+        title: 'Recherche terrain :',
+        description: 'Tester vos prototypes chaque semaine auprès de patients et de praticiens.',
+      },
+    ],
+    qualifications: [
+      {
+        id: 'q1',
+        icon: 'award',
+        title: "4+ ans d'expérience en Product Design",
+        description:
+          "Expérience sur des produits B2C à forte volumétrie et maîtrise de l'accessibilité (WCAG).",
+      },
+    ],
+    benefits: [
+      {
+        id: 'b1',
+        icon: 'health',
+        title: 'Santé & Bien-être',
+        description: 'Mutuelle prise en charge + abonnement sport',
+        accent: 'secondary',
+      },
+      {
+        id: 'b2',
+        icon: 'vacation',
+        title: 'RTT & Télétravail',
+        description: '11 jours de RTT et 2 à 3 jours de remote/semaine',
+        accent: 'primary',
+      },
+    ],
+    companyBio:
+      'Doctolib accompagne les professionnels de santé et facilite l’accès aux soins pour des millions de patients en France, en Allemagne et en Italie.',
+    companyRating: '4.5',
+    companyReviews: '(1 840 avis)',
+    companyStats: {
+      size: '2 800+',
+      stage: 'Licorne',
+      hq: 'Paris / Berlin',
+    },
+  },
+  {
+    id: 'datadog-staff-mobile-engineer',
+    title: 'Senior Mobile Engineer (iOS / Android)',
+    company: 'Datadog',
+    industry: 'Cloud & Observabilité',
+    brandTone: 'tertiary',
+    isActivelyHiring: true,
+    workMode: 'Hybride',
+    location: 'Paris 9e',
+    postedAgo: 'Publié il y a 4 jours',
+    applicantsCount: '19 candidats',
+    salaryRange: '110 000 € - 145 000 €/an',
+    minSalaryK: 110,
+    contractType: 'Temps plein',
+    level: 'Niveau Senior',
+    category: 'Engineering',
+    metrics: [
+      {
+        id: 'salary',
+        label: '110 000 € - 145 000 €/an',
+        icon: 'payments',
+        tone: 'emerald',
+      },
+      { id: 'type', label: 'Temps plein', icon: 'schedule', tone: 'neutral' },
+      { id: 'level', label: 'Niveau Senior', icon: 'level', tone: 'neutral' },
+      { id: 'equity', label: 'RSU cotées (NASDAQ)', icon: 'equity', tone: 'indigo' },
+    ],
+    overview:
+      "Développez les SDK mobiles et l'application d'alerte temps réel de Datadog utilisés par des milliers d'équipes SRE et DevOps dans le monde.",
+    highlightTitle: 'Ingénierie de pointe à Paris',
+    highlightSubtitle: 'R&D historique de Datadog avec plus de 800 ingénieurs.',
+    responsibilities: [
+      {
+        id: 'r1',
+        title: 'Performance & Télémétrie :',
+        description:
+          'Optimiser la consommation batterie/CPU des agents mobiles sur iOS et Android.',
+      },
+    ],
+    qualifications: [
+      {
+        id: 'q1',
+        icon: 'award',
+        title: '5+ ans en développement mobile natif',
+        description: 'Solide expertise Swift/Kotlin ou React Native avec compréhension bas niveau.',
+      },
+    ],
+    benefits: [
+      {
+        id: 'b1',
+        icon: 'learning',
+        title: 'Budget conférence',
+        description: 'Conférences internationales et formations financées',
+        accent: 'primary',
+      },
+      {
+        id: 'b2',
+        icon: 'retirement',
+        title: 'Actionnariat salarié',
+        description: 'Plan ESPP avantageux + RSU annuelles',
+        accent: 'tertiary',
+      },
+    ],
+    companyBio:
+      'Datadog est la plateforme de surveillance et de sécurité pour les applications cloud.',
+    companyRating: '4.7',
+    companyReviews: '(2 100 avis)',
+    companyStats: {
+      size: '6 000+',
+      stage: 'Cotée (DDOG)',
+      hq: 'New York / Paris',
+    },
+  },
+  {
+    id: 'huggingface-ml-engineer',
+    title: 'Machine Learning Engineer — Open Source',
+    company: 'Hugging Face',
+    industry: 'IA & Open Source',
+    brandTone: 'secondary',
+    isActivelyHiring: true,
+    workMode: 'Télétravail',
+    location: 'Remote Europe',
+    postedAgo: "Publié aujourd'hui",
+    applicantsCount: '45 candidats',
+    salaryRange: '125 000 € - 160 000 €/an',
+    minSalaryK: 125,
+    contractType: 'Temps plein',
+    level: 'Niveau Senior',
+    category: 'IA & Data',
+    metrics: [
+      {
+        id: 'salary',
+        label: '125 000 € - 160 000 €/an',
+        icon: 'payments',
+        tone: 'emerald',
+      },
+      { id: 'type', label: 'Temps plein', icon: 'schedule', tone: 'neutral' },
+      { id: 'level', label: 'Niveau Senior', icon: 'level', tone: 'neutral' },
+      { id: 'equity', label: 'Equity', icon: 'equity', tone: 'indigo' },
+    ],
+    overview:
+      'Contribuez aux bibliothèques transformers, diffusers et aux pipelines d’inférence rapide utilisés par la communauté IA mondiale.',
+    highlightTitle: '100% Open Source & Remote-First',
+    highlightSubtitle: 'Travail asynchrone, impact direct sur des millions de devs.',
+    responsibilities: [
+      {
+        id: 'r1',
+        title: 'Optimisation de modèles :',
+        description: 'Accélérer la quantification et le serving de modèles multimodaux.',
+      },
+    ],
+    qualifications: [
+      {
+        id: 'q1',
+        icon: 'network',
+        title: 'PyTorch, CUDA & Python avancé',
+        description: 'Expérience avérée en entraînement ou inférence de LLM à grande échelle.',
+      },
+    ],
+    benefits: [
+      {
+        id: 'b1',
+        icon: 'vacation',
+        title: 'Congés flexibles',
+        description: 'Full-remote + retraites d’équipe annuelles',
+        accent: 'secondary',
+      },
+    ],
+    companyBio:
+      "Hugging Face est la plateforme collaborative de référence pour le Machine Learning et l'IA open source.",
+    companyRating: '4.9',
+    companyReviews: '(340 avis)',
+    companyStats: {
+      size: '300+',
+      stage: 'Série D',
+      hq: 'Paris / NYC',
+    },
+  },
+  {
+    id: 'backmarket-staff-pm',
+    title: 'Staff Product Manager — Marketplace',
+    company: 'Back Market',
+    industry: 'E-Commerce & Économie Circulaire',
+    brandTone: 'primary',
+    isActivelyHiring: false,
+    workMode: 'Hybride',
+    location: 'Paris / Bordeaux',
+    postedAgo: 'Publié il y a 6 jours',
+    applicantsCount: '51 candidats',
+    salaryRange: '90 000 € - 115 000 €/an',
+    minSalaryK: 90,
+    contractType: 'Temps plein',
+    level: 'Niveau Staff',
+    category: 'Product',
+    metrics: [
+      {
+        id: 'salary',
+        label: '90 000 € - 115 000 €/an',
+        icon: 'payments',
+        tone: 'emerald',
+      },
+      { id: 'type', label: 'Temps plein', icon: 'schedule', tone: 'neutral' },
+      { id: 'level', label: 'Niveau Staff', icon: 'level', tone: 'neutral' },
+      { id: 'equity', label: 'BSPCE inclus', icon: 'equity', tone: 'indigo' },
+    ],
+    overview:
+      'Pilotez la stratégie de qualité et de confiance acheteur sur 18 marchés pour démocratiser les appareils reconditionnés.',
+    highlightTitle: 'Mission à fort impact écologique',
+    highlightSubtitle: 'Rattaché au VP Product Marketplace.',
+    responsibilities: [
+      {
+        id: 'r1',
+        title: 'Conversion & Confiance :',
+        description: 'Réinventer les garanties et le parcours de reprise sur web et mobile.',
+      },
+    ],
+    qualifications: [
+      {
+        id: 'q1',
+        icon: 'award',
+        title: '6+ ans en Product Management',
+        description: 'Expérience sur des marketplaces B2C internationales à forte croissance.',
+      },
+    ],
+    benefits: [
+      {
+        id: 'b1',
+        icon: 'health',
+        title: 'Mutuelle & Remboursement mobilité',
+        description: 'Forfait mobilités durables + mutuelle Alan',
+        accent: 'secondary',
+      },
+    ],
+    companyBio:
+      'Back Market est la première place de marché mondiale dédiée aux produits électroniques reconditionnés.',
+    companyRating: '4.4',
+    companyReviews: '(780 avis)',
+    companyStats: {
+      size: '700+',
+      stage: 'Licorne',
+      hq: 'Paris',
+    },
   },
 ];

@@ -1,14 +1,15 @@
 import '@/global.css';
 
 import React, { useEffect } from 'react';
+import * as SystemUI from 'expo-system-ui';
 import { NAV_THEME } from '@/lib/theme';
 import { ThemeProvider } from 'expo-router/react-navigation';
 import { PortalHost } from '@rn-primitives/portal';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Uniwind, useUniwind } from 'uniwind';
+import { useUniwind } from 'uniwind';
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
-import { SafeAreaListener } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { JobsProvider } from '@/context/jobs-context';
 import { ProfileProvider, useProfile } from '@/context/profile-context';
@@ -37,20 +38,28 @@ function OnboardingGate() {
 export default function RootLayout() {
   const { theme } = useUniwind();
   const activeMode = theme === 'dark' ? 'dark' : 'light';
+  const bgColor = NAV_THEME[activeMode].colors.background;
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(bgColor).catch(() => {});
+  }, [bgColor]);
 
   return (
-    <SafeAreaListener
-      onChange={({ insets }) => {
-        Uniwind.updateInsets(insets);
-      }}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <GluestackUIProvider mode={activeMode}>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: bgColor }}>
+        <GluestackUIProvider mode={activeMode} style={{ backgroundColor: bgColor }}>
           <ProfileProvider>
             <JobsProvider>
               <ThemeProvider value={NAV_THEME[activeMode]}>
                 <StatusBar style={activeMode === 'dark' ? 'light' : 'dark'} />
                 <OnboardingGate />
-                <Stack screenOptions={{ headerShown: false }}>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: bgColor },
+                    gestureEnabled: true,
+                    freezeOnBlur: false,
+                  }}>
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
                   <Stack.Screen name="job/[id]" />
@@ -61,6 +70,6 @@ export default function RootLayout() {
           </ProfileProvider>
         </GluestackUIProvider>
       </GestureHandlerRootView>
-    </SafeAreaListener>
+    </SafeAreaProvider>
   );
 }

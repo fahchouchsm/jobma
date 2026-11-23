@@ -8,7 +8,7 @@ import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
-import { Pressable } from '@/components/ui/pressable';
+import { ScalePressable } from '@/components/animated/scale-pressable';
 
 interface JobApplyBarProps {
   isSaved: boolean;
@@ -33,16 +33,17 @@ export function JobApplyBar({
 
   const inner = (
     <HStack className="w-full max-w-md items-center self-center" space="sm">
-      <Pressable
+      <ScalePressable
         accessibilityLabel="Enregistrer cette offre"
         onPress={onToggleSave}
-        className="bg-muted h-12 w-12 shrink-0 items-center justify-center rounded-xl active:opacity-80">
+        scaleTo={0.86}
+        className="bg-muted h-12 w-12 shrink-0 items-center justify-center rounded-xl">
         <Icon
           as={Bookmark}
           size="md"
           className={isSaved ? 'text-primary fill-primary' : 'text-muted-foreground'}
         />
-      </Pressable>
+      </ScalePressable>
 
       <Button
         size="lg"
@@ -76,16 +77,14 @@ export function JobApplyBar({
         intensity={80}
         tint={isDark ? 'dark' : 'light'}
         style={{ paddingBottom }}
-        className="border-border/70 bg-card/80 absolute right-0 bottom-0 left-0 border-t px-4 pt-3">
+        className="border-border/70 bg-card/80 border-t px-4 pt-3">
         {inner}
       </BlurView>
     );
   }
 
   return (
-    <Box
-      className="bg-card border-border absolute right-0 bottom-0 left-0 border-t px-4 pt-3 shadow-lg"
-      style={{ paddingBottom }}>
+    <Box className="bg-card border-border border-t px-4 pt-3" style={{ paddingBottom }}>
       {inner}
     </Box>
   );

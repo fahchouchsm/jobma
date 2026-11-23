@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { RefreshControl } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { Briefcase, CheckCircle2, Search, Sparkles, X } from 'lucide-react-native';
+import { ArrowUpDown, Briefcase, CheckCircle2, Search, Sparkles, X } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
@@ -18,16 +20,29 @@ import { useJobs } from '@/context/jobs-context';
 import { useProfile } from '@/context/profile-context';
 import { JOBS, type JobListing } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
+import { computeJobMatch } from '@/lib/job-match';
 
-type FilterChip = 'Toutes' | 'Télétravail' | 'Favoris' | 'Design' | 'Engineering' | 'Product';
+type FilterChip =
+  | 'Toutes'
+  | 'Recommandées'
+  | 'Télétravail'
+  | 'Favoris'
+  | 'Design'
+  | 'Engineering'
+  | 'Product'
+  | 'IA & Data';
+
+type SortMode = 'match' | 'salary';
 
 const FILTER_CHIPS: FilterChip[] = [
   'Toutes',
+  'Recommandées',
   'Télétravail',
   'Favoris',
   'Design',
   'Engineering',
   'Product',
+  'IA & Data',
 ];
 
 export default function JobDiscoveryScreen() {
@@ -40,9 +55,11 @@ export default function JobDiscoveryScreen() {
 
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterChip>('Toutes');
+  const [sortMode, setSortMode] = useState<SortMode>('match');
+  const [refreshing, setRefreshing] = useState(false);
 
   const filteredJobs = useMemo(() => {
-    return JOBS.filter((job) => {
+    const matches = JOBS.filter((job) => {
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
@@ -53,11 +70,35 @@ export default function JobDiscoveryScreen() {
 
       if (!matchesQuery) return false;
       if (activeFilter === 'Toutes') return true;
+      if (activeFilter === 'Recommandées') {
+        return profile.domains.length === 0 || profile.domains.includes(job.category);
+      }
       if (activeFilter === 'Télétravail') return job.workMode === 'Télétravail';
       if (activeFilter === 'Favoris') return isSaved(job.id);
       return job.category === activeFilter;
     });
-  }, [query, activeFilter, isSaved]);
+
+    return [...matches].sort((a, b) => {
+      if (sortMode === 'salary') {
+        return b.minSalaryK - a.minSalaryK;
+      }
+      const aMatch =
+        (profile.domains.includes(a.category) ? 2 : 0) +
+        (profile.workModes.includes(a.workMode) ? 1 : 0);
+      const bMatch =
+        (profile.domains.includes(b.category) ? 2 : 0) +
+        (profile.workModes.includes(b.workMode) ? 1 : 0);
+      return bMatch - aMatch;
+    });
+  }, [query, activeFilter, sortMode, isSaved, profile.domains, profile.workModes]);
+
+  const handleRefresh = () => {
+    triggerHaptic('light');
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 650);
+  };
 
   const handleToggleBookmark = (job: JobListing) => {
     const saved = toggleSave(job.id);
@@ -84,7 +125,8 @@ export default function JobDiscoveryScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
         <VStack space="md" className="px-4 pt-4">
           {/* Greeting & Intro */}
           <VStack space="xs">
@@ -157,22 +199,37 @@ export default function JobDiscoveryScreen() {
             })}
           </ScrollView>
 
-          {/* Results Header */}
+          {/* Results & Sort Header */}
           <HStack className="items-center justify-between pt-1">
             <Text size="xs" bold className="text-muted-foreground uppercase">
               {filteredJobs.length} {filteredJobs.length > 1 ? 'opportunités' : 'opportunité'}
             </Text>
-            {(query.trim().length > 0 || activeFilter !== 'Toutes') && (
+
+            <HStack className="items-center" space="sm">
+              {(query.trim().length > 0 || activeFilter !== 'Toutes') && (
+                <Pressable
+                  onPress={() => {
+                    setQuery('');
+                    setActiveFilter('Toutes');
+                  }}>
+                  <Text size="xs" bold className="text-primary">
+                    Réinitialiser
+                  </Text>
+                </Pressable>
+              )}
+
               <Pressable
                 onPress={() => {
-                  setQuery('');
-                  setActiveFilter('Toutes');
-                }}>
-                <Text size="xs" bold className="text-primary">
-                  Réinitialiser
+                  triggerHaptic('light');
+                  setSortMode((prev) => (prev === 'match' ? 'salary' : 'match'));
+                }}
+                className="bg-muted flex-row items-center gap-1 rounded-full px-2.5 py-1">
+                <Icon as={ArrowUpDown} size="xs" className="text-primary" />
+                <Text size="2xs" bold className="text-foreground">
+                  {sortMode === 'match' ? 'Pertinence' : 'Salaire ↓'}
                 </Text>
               </Pressable>
-            )}
+            </HStack>
           </HStack>
 
           {/* Job Cards */}
@@ -190,16 +247,21 @@ export default function JobDiscoveryScreen() {
                 }}
               />
             ) : (
-              filteredJobs.map((job) => (
-                <JobCard
+              filteredJobs.map((job, index) => (
+                <Animated.View
                   key={job.id}
-                  job={job}
-                  variant="discover"
-                  isSaved={isSaved(job.id)}
-                  isApplied={isApplied(job.id)}
-                  onPress={() => router.push(`/job/${job.id}`)}
-                  onToggleSave={() => handleToggleBookmark(job)}
-                />
+                  entering={FadeInDown.delay(index * 55).duration(280)}
+                  layout={LinearTransition.springify()}>
+                  <JobCard
+                    job={job}
+                    variant="discover"
+                    matchScore={computeJobMatch(job, profile).score}
+                    isSaved={isSaved(job.id)}
+                    isApplied={isApplied(job.id)}
+                    onPress={() => router.push(`/job/${job.id}`)}
+                    onToggleSave={() => handleToggleBookmark(job)}
+                  />
+                </Animated.View>
               ))
             )}
           </VStack>

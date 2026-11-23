@@ -1,4 +1,5 @@
 import React from 'react';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Banknote, Clock, Medal, PieChart } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
@@ -21,7 +22,7 @@ export function JobMetricsRow({ metrics }: { metrics: JobMetric[] }) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-        {metrics.map((metric) => {
+        {metrics.map((metric, index) => {
           const MetricIcon = METRIC_ICON_MAP[metric.icon];
           const containerClass =
             metric.tone === 'emerald'
@@ -43,14 +44,16 @@ export function JobMetricsRow({ metrics }: { metrics: JobMetric[] }) {
                 : 'text-foreground';
 
           return (
-            <Box key={metric.id} className={`${containerClass} rounded-xl px-3 py-2 shadow-2xs`}>
-              <HStack className="items-center" space="xs">
-                <Icon as={MetricIcon} size="sm" className={iconClass} />
-                <Text size="xs" bold={metric.tone === 'emerald'} className={textClass}>
-                  {metric.label}
-                </Text>
-              </HStack>
-            </Box>
+            <Animated.View key={metric.id} entering={FadeInDown.delay(index * 60).duration(280)}>
+              <Box className={`${containerClass} rounded-xl px-3 py-2 shadow-2xs`}>
+                <HStack className="items-center" space="xs">
+                  <Icon as={MetricIcon} size="sm" className={iconClass} />
+                  <Text size="xs" bold={metric.tone === 'emerald'} className={textClass}>
+                    {metric.label}
+                  </Text>
+                </HStack>
+              </Box>
+            </Animated.View>
           );
         })}
       </ScrollView>
