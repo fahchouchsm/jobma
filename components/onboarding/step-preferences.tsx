@@ -29,7 +29,7 @@ const WORK_MODES: { id: WorkMode; label: string; icon: typeof Globe }[] = [
 
 const CONTRACT_TYPES: ContractType[] = ['CDI', 'Freelance', 'Stage / Alternance'];
 
-const SALARY_STEPS = [45, 65, 90, 120, 150];
+const SALARY_STEPS = [5, 8, 12, 18, 25];
 
 const AVAILABILITIES: Availability[] = ['Immédiate', 'Sous 1 mois', 'Sous 3 mois', 'En veille'];
 
@@ -75,7 +75,7 @@ export function StepPreferences({ profile, onChange }: StepPreferencesProps) {
               <Pressable
                 key={item.id}
                 onPress={() => toggleWorkMode(item.id)}
-                className={`flex-1 items-center rounded-2xl border p-3 ${
+                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${
                   active ? 'bg-primary-fixed border-primary' : 'bg-card border-border'
                 }`}>
                 <VStack space="xs" className="items-center">
@@ -87,6 +87,7 @@ export function StepPreferences({ profile, onChange }: StepPreferencesProps) {
                   <Text
                     size="xs"
                     bold={active}
+                    numberOfLines={1}
                     className={active ? 'text-on-primary-fixed' : 'text-foreground'}>
                     {item.label}
                   </Text>
@@ -127,16 +128,16 @@ export function StepPreferences({ profile, onChange }: StepPreferencesProps) {
       {/* Salary Target */}
       <Card className="bg-card border-border rounded-2xl border p-4">
         <VStack space="sm">
-          <HStack className="items-center justify-between">
-            <HStack className="items-center" space="xs">
-              <Icon as={Banknote} size="sm" className="text-secondary" />
-              <Text size="xs" bold className="text-foreground">
-                Salaire annuel minimum
+          <HStack className="items-center justify-between" space="sm">
+            <HStack className="min-w-0 flex-1 items-center" space="xs">
+              <Icon as={Banknote} size="sm" className="text-secondary shrink-0" />
+              <Text size="xs" bold numberOfLines={1} className="text-foreground flex-1">
+                Salaire mensuel minimum
               </Text>
             </HStack>
-            <Box className="bg-secondary-container/60 rounded-full px-2.5 py-1">
+            <Box className="bg-secondary-container shrink-0 rounded-full px-2.5 py-1">
               <Text size="xs" bold className="text-on-secondary-container">
-                {profile.minSalaryK} 000 €+ / an
+                {profile.minSalaryK} 000+ MAD/mois
               </Text>
             </Box>
           </HStack>
@@ -153,14 +154,14 @@ export function StepPreferences({ profile, onChange }: StepPreferencesProps) {
                   }}
                   className={`rounded-xl border px-3.5 py-2 ${
                     active
-                      ? 'bg-secondary-container/60 border-secondary'
+                      ? 'bg-secondary-container border-secondary'
                       : 'bg-muted border-transparent'
                   }`}>
                   <Text
                     size="xs"
                     bold={active}
                     className={active ? 'text-on-secondary-container' : 'text-foreground'}>
-                    {amount}k+ €
+                    {amount}k+ MAD
                   </Text>
                 </Pressable>
               );

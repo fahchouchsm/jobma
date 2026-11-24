@@ -103,36 +103,37 @@ export function StepSummary({ profile }: { profile: CandidateProfile }) {
 
           {/* Preferences */}
           <VStack space="xs">
-            <HStack className="items-center" space="xs">
-              <Icon as={Globe} size="xs" className="text-primary" />
-              <Text size="xs" className="text-foreground">
+            <HStack className="items-start" space="xs">
+              <Icon as={Globe} size="xs" className="text-primary mt-0.5 shrink-0" />
+              <Text size="xs" className="text-foreground flex-1 leading-snug">
                 {profile.workModes.length > 0 ? profile.workModes.join(', ') : 'Mode flexible'} •{' '}
                 {profile.contractTypes.length > 0 ? profile.contractTypes.join(', ') : 'CDI'}
               </Text>
             </HStack>
 
-            <HStack className="items-center" space="xs">
-              <Icon as={Banknote} size="xs" className="text-secondary" />
-              <Text size="xs" bold className="text-on-secondary-container">
-                Objectif : {profile.minSalaryK} 000 €+ / an
-              </Text>
-              <Text size="xs" className="text-muted-foreground">
-                • {profile.availability}
+            <HStack className="items-start" space="xs">
+              <Icon as={Banknote} size="xs" className="text-secondary mt-0.5 shrink-0" />
+              <Text size="xs" className="text-muted-foreground flex-1 leading-snug">
+                <Text size="xs" bold className="text-on-secondary-container">
+                  Objectif : {profile.minSalaryK} 000+ MAD / mois
+                </Text>
+                {' • '}
+                {profile.availability}
               </Text>
             </HStack>
 
-            <HStack className="items-center" space="xs">
-              <Icon as={FileText} size="xs" className="text-muted-foreground" />
-              <Text size="xs" className="text-muted-foreground">
+            <HStack className="items-start" space="xs">
+              <Icon as={FileText} size="xs" className="text-muted-foreground mt-0.5 shrink-0" />
+              <Text size="xs" className="text-muted-foreground flex-1 leading-snug">
                 {profile.cvFile
                   ? `CV attaché : ${profile.cvFile.name}`
                   : 'Aucun CV importé (ajoutable dans Profil)'}
               </Text>
             </HStack>
 
-            <HStack className="items-center" space="xs">
-              <Icon as={Briefcase} size="xs" className="text-muted-foreground" />
-              <Text size="xs" className="text-muted-foreground">
+            <HStack className="items-start" space="xs">
+              <Icon as={Briefcase} size="xs" className="text-muted-foreground mt-0.5 shrink-0" />
+              <Text size="xs" className="text-muted-foreground flex-1 leading-snug">
                 Candidature en 1 clic : {profile.oneClickApplyEnabled ? 'Activée' : 'Désactivée'}
               </Text>
             </HStack>

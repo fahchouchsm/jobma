@@ -11,6 +11,7 @@ import { useUniwind } from 'uniwind';
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AuthProvider } from '@/context/auth-context';
 import { JobsProvider } from '@/context/jobs-context';
 import { ProfileProvider, useProfile } from '@/context/profile-context';
 
@@ -27,7 +28,8 @@ function OnboardingGate() {
   useEffect(() => {
     if (!isHydrated) return;
     const inOnboarding = segments[0] === 'onboarding';
-    if (!hasCompletedOnboarding && !inOnboarding) {
+    const inAuth = segments[0] === 'auth';
+    if (!hasCompletedOnboarding && !inOnboarding && !inAuth) {
       router.replace('/onboarding');
     }
   }, [isHydrated, hasCompletedOnboarding, segments, router]);
@@ -48,26 +50,30 @@ export default function RootLayout() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: bgColor }}>
         <GluestackUIProvider mode={activeMode} style={{ backgroundColor: bgColor }}>
-          <ProfileProvider>
-            <JobsProvider>
-              <ThemeProvider value={NAV_THEME[activeMode]}>
-                <StatusBar style={activeMode === 'dark' ? 'light' : 'dark'} />
-                <OnboardingGate />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: bgColor },
-                    gestureEnabled: true,
-                    freezeOnBlur: false,
-                  }}>
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
-                  <Stack.Screen name="job/[id]" />
-                </Stack>
-                <PortalHost />
-              </ThemeProvider>
-            </JobsProvider>
-          </ProfileProvider>
+          <AuthProvider>
+            <ProfileProvider>
+              <JobsProvider>
+                <ThemeProvider value={NAV_THEME[activeMode]}>
+                  <StatusBar style={activeMode === 'dark' ? 'light' : 'dark'} />
+                  <OnboardingGate />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: bgColor },
+                      gestureEnabled: true,
+                      freezeOnBlur: false,
+                    }}>
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+                    <Stack.Screen name="auth/login" />
+                    <Stack.Screen name="auth/register" />
+                    <Stack.Screen name="job/[id]" />
+                  </Stack>
+                  <PortalHost />
+                </ThemeProvider>
+              </JobsProvider>
+            </ProfileProvider>
+          </AuthProvider>
         </GluestackUIProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

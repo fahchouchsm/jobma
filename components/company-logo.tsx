@@ -6,20 +6,25 @@ import { Text } from '@/components/ui/text';
 interface CompanyLogoProps {
   name: string;
   logoUrl?: string;
-  size?: 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
   tone?: 'primary' | 'secondary' | 'tertiary';
 }
 
 export function CompanyLogo({ name, logoUrl, size = 'md', tone = 'primary' }: CompanyLogoProps) {
   const [failed, setFailed] = useState(false);
 
-  const dimensions = size === 'lg' ? 'w-14 h-14' : 'w-12 h-12';
-  const initials = name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  const dimensions =
+    size === 'lg' ? 'w-14 h-14' : size === 'sm' ? 'w-9 h-9' : 'w-12 h-12';
+  const radius = size === 'sm' ? 'rounded-lg' : 'rounded-xl';
+  const initials =
+    name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'JM';
 
   const fallbackBg =
     tone === 'secondary' ? 'bg-secondary' : tone === 'tertiary' ? 'bg-tertiary' : 'bg-primary';
@@ -27,7 +32,7 @@ export function CompanyLogo({ name, logoUrl, size = 'md', tone = 'primary' }: Co
   if (logoUrl && !failed) {
     return (
       <Box
-        className={`${dimensions} bg-accent border-border shrink-0 overflow-hidden rounded-xl border`}>
+        className={`${dimensions} ${radius} bg-accent border-border shrink-0 overflow-hidden border`}>
         <Image
           source={{ uri: logoUrl }}
           alt={name}
@@ -40,9 +45,9 @@ export function CompanyLogo({ name, logoUrl, size = 'md', tone = 'primary' }: Co
   }
 
   return (
-    <Box className={`${dimensions} rounded-xl ${fallbackBg} shrink-0 items-center justify-center`}>
+    <Box className={`${dimensions} ${radius} ${fallbackBg} shrink-0 items-center justify-center`}>
       <Text
-        size={size === 'lg' ? 'lg' : 'md'}
+        size={size === 'lg' ? 'lg' : size === 'sm' ? 'xs' : 'md'}
         bold
         className="text-primary-foreground tracking-tight">
         {initials}

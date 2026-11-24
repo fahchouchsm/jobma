@@ -32,12 +32,13 @@ export function JobSegmentedTabs({ activeTab, onChange }: JobSegmentedTabsProps)
                 triggerHaptic('light');
                 onChange(tab.id);
               }}
-              className={`flex-1 items-center justify-center rounded-lg py-2 ${
+              className={`flex-1 items-center justify-center rounded-lg px-1 py-2 ${
                 isActive ? 'bg-card shadow-2xs' : ''
               }`}>
               <Text
                 size="xs"
                 bold={isActive}
+                numberOfLines={1}
                 className={isActive ? 'text-primary' : 'text-muted-foreground'}>
                 {tab.label}
               </Text>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BellPlus, Clock, SlidersHorizontal, Trash2, X } from 'lucide-react-native';
+import { BellPlus, Clock, MapPin, SlidersHorizontal, Trash2, X } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -13,18 +13,30 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import type { JobAlert, WorkMode } from '@/context/profile-context';
 import { triggerHaptic } from '@/lib/haptics';
+import type { OfferContractType } from '@/types/offer';
 
 const WORK_MODE_FILTERS: (WorkMode | 'Tous')[] = ['Tous', 'Télétravail', 'Hybride', 'Présentiel'];
-
-const SALARY_FILTERS = [0, 70, 100, 130];
+const CONTRACT_TYPE_FILTERS: { id: OfferContractType | 'all'; label: string }[] = [
+  { id: 'all', label: 'Tous' },
+  { id: 'full_time', label: 'CDI / Temps plein' },
+  { id: 'internship', label: 'Stage' },
+  { id: 'freelance', label: 'Freelance' },
+  { id: 'part_time', label: 'Temps partiel' },
+];
+const CITY_FILTERS = ['Toutes', 'Casablanca', 'Rabat', 'Tanger', 'Marrakech', 'Agadir', 'Fès'];
+const SALARY_FILTERS_MAD = [0, 5, 10, 15, 25];
 
 interface FilterSheetProps {
   visible: boolean;
   workMode: WorkMode | 'Tous';
+  contractType: OfferContractType | 'all';
+  location: string;
   minSalaryK: number;
   recentSearches: string[];
   savedAlerts: JobAlert[];
   onChangeWorkMode: (mode: WorkMode | 'Tous') => void;
+  onChangeContractType: (contract: OfferContractType | 'all') => void;
+  onChangeLocation: (city: string) => void;
   onChangeMinSalary: (salary: number) => void;
   onSelectSearch: (term: string) => void;
   onClearSearches: () => void;
@@ -37,10 +49,14 @@ interface FilterSheetProps {
 export function FilterSheet({
   visible,
   workMode,
+  contractType,
+  location,
   minSalaryK,
   recentSearches,
   savedAlerts,
   onChangeWorkMode,
+  onChangeContractType,
+  onChangeLocation,
   onChangeMinSalary,
   onSelectSearch,
   onClearSearches,
@@ -57,7 +73,7 @@ export function FilterSheet({
         <Pressable onPress={onClose} className="bg-foreground/45 absolute inset-0" />
 
         <Box
-          className="bg-card border-border max-h-[82%] rounded-t-3xl border-t px-5 pt-4"
+          className="bg-card border-border max-h-[84%] rounded-t-3xl border-t px-5 pt-4"
           style={{
             paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 20),
           }}>
@@ -89,6 +105,41 @@ export function FilterSheet({
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <VStack space="md" className="pb-2">
+                {/* City Filter (Morocco) */}
+                <VStack space="xs">
+                  <HStack className="items-center" space="xs">
+                    <Icon as={MapPin} size="xs" className="text-muted-foreground" />
+                    <Text size="xs" bold className="text-foreground">
+                      Ville au Maroc
+                    </Text>
+                  </HStack>
+                  <HStack className="flex-wrap gap-2">
+                    {CITY_FILTERS.map((city) => {
+                      const active = (location || 'Toutes') === city;
+                      return (
+                        <Pressable
+                          key={city}
+                          onPress={() => {
+                            triggerHaptic('light');
+                            onChangeLocation(city === 'Toutes' ? '' : city);
+                          }}
+                          className={`rounded-full border px-3.5 py-2 ${
+                            active
+                              ? 'bg-primary-fixed border-primary'
+                              : 'bg-background border-border'
+                          }`}>
+                          <Text
+                            size="xs"
+                            bold={active}
+                            className={active ? 'text-primary' : 'text-muted-foreground'}>
+                            {city}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </HStack>
+                </VStack>
+
                 {/* Work Mode */}
                 <VStack space="xs">
                   <Text size="xs" bold className="text-foreground">
@@ -121,13 +172,45 @@ export function FilterSheet({
                   </HStack>
                 </VStack>
 
-                {/* Minimum Salary */}
+                {/* Contract Type */}
                 <VStack space="xs">
                   <Text size="xs" bold className="text-foreground">
-                    Salaire annuel minimum
+                    Type de contrat
                   </Text>
                   <HStack className="flex-wrap gap-2">
-                    {SALARY_FILTERS.map((salary) => {
+                    {CONTRACT_TYPE_FILTERS.map((item) => {
+                      const active = contractType === item.id;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => {
+                            triggerHaptic('light');
+                            onChangeContractType(item.id);
+                          }}
+                          className={`rounded-full border px-3.5 py-2 ${
+                            active
+                              ? 'bg-primary-fixed border-primary'
+                              : 'bg-background border-border'
+                          }`}>
+                          <Text
+                            size="xs"
+                            bold={active}
+                            className={active ? 'text-primary' : 'text-muted-foreground'}>
+                            {item.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </HStack>
+                </VStack>
+
+                {/* Minimum Monthly Salary (MAD) */}
+                <VStack space="xs">
+                  <Text size="xs" bold className="text-foreground">
+                    Salaire mensuel minimum (MAD)
+                  </Text>
+                  <HStack className="flex-wrap gap-2">
+                    {SALARY_FILTERS_MAD.map((salary) => {
                       const active = minSalaryK === salary;
                       return (
                         <Pressable
@@ -138,7 +221,7 @@ export function FilterSheet({
                           }}
                           className={`rounded-full border px-3.5 py-2 ${
                             active
-                              ? 'bg-secondary-container/60 border-secondary'
+                              ? 'bg-secondary-container border-secondary'
                               : 'bg-background border-border'
                           }`}>
                           <Text
@@ -147,7 +230,7 @@ export function FilterSheet({
                             className={
                               active ? 'text-on-secondary-container' : 'text-muted-foreground'
                             }>
-                            {salary === 0 ? 'Tous salaires' : `${salary}k+ €`}
+                            {salary === 0 ? 'Tous salaires' : `${salary}k+ MAD`}
                           </Text>
                         </Pressable>
                       );
@@ -201,13 +284,13 @@ export function FilterSheet({
                       {savedAlerts.map((alert) => (
                         <Box key={alert.id} className="bg-muted rounded-xl px-3 py-2">
                           <HStack className="items-center justify-between">
-                            <VStack className="flex-1">
+                            <VStack className="min-w-0 flex-1">
                               <Text size="xs" bold className="text-foreground">
                                 {alert.query}
                               </Text>
                               <Text size="2xs" className="text-muted-foreground">
                                 {alert.workMode ?? 'Tous modes'}
-                                {alert.minSalaryK ? ` • ${alert.minSalaryK}k+ €` : ''}
+                                {alert.minSalaryK ? ` • ${alert.minSalaryK}k+ MAD` : ''}
                               </Text>
                             </VStack>
                             <Pressable onPress={() => onRemoveAlert(alert.id)} className="p-1.5">
@@ -224,11 +307,15 @@ export function FilterSheet({
 
             {/* Footer Buttons */}
             <HStack space="sm">
-              <Button variant="outline" size="lg" onPress={onCreateAlert} className="rounded-xl">
+              <Button
+                variant="outline"
+                size="default"
+                onPress={onCreateAlert}
+                className="rounded-xl px-3">
                 <ButtonIcon as={BellPlus} />
-                <ButtonText>Créer alerte</ButtonText>
+                <ButtonText>Alerte</ButtonText>
               </Button>
-              <Button size="lg" onPress={onClose} className="flex-1 rounded-xl">
+              <Button size="default" onPress={onClose} className="flex-1 rounded-xl">
                 <ButtonText className="font-bold">Voir les offres</ButtonText>
               </Button>
             </HStack>

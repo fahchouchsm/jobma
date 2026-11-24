@@ -1,18 +1,21 @@
-import React, { useMemo, useState } from 'react';
-import { RefreshControl } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowUpDown,
   Briefcase,
   CheckCircle2,
+  ChevronDown,
+  MapPin,
+  RefreshCw,
   Search,
   SlidersHorizontal,
-  Sparkles,
   X,
 } from 'lucide-react-native';
+import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
-import { Heading } from '@/components/ui/heading';
+import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
@@ -22,42 +25,64 @@ import { Text } from '@/components/ui/text';
 import { Toast, ToastTitle, useToast } from '@/components/ui/toast';
 import { VStack } from '@/components/ui/vstack';
 import { FilterSheet } from '@/components/discover/filter-sheet';
+import { JobCardSkeleton } from '@/components/discover/job-card-skeleton';
 import { EmptyState } from '@/components/empty-state';
 import { JobCard } from '@/components/job-card';
-import { JobmaHeader } from '@/components/jobma-header';
+import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
 import { useProfile, type WorkMode } from '@/context/profile-context';
-import { JOBS, type JobListing } from '@/data/jobs';
+import { type JobListing, USER_PROFILE_AVATAR } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 import { computeJobMatch } from '@/lib/job-match';
+import type {
+  OfferCategory,
+  OfferContractType,
+  OffersQueryParams,
+  OfferWorkMode,
+} from '@/types/offer';
 
-type FilterChip =
-  | 'Toutes'
-  | 'Recommandées'
-  | 'Télétravail'
-  | 'Favoris'
-  | 'Design'
-  | 'Engineering'
-  | 'Product'
-  | 'IA & Data';
-
+type CategoryTab = 'Toutes' | 'Engineering' | 'Design' | 'Product' | 'IA & Data' | 'Télétravail';
 type SortMode = 'match' | 'salary';
 
-const FILTER_CHIPS: FilterChip[] = [
-  'Toutes',
-  'Recommandées',
-  'Télétravail',
-  'Favoris',
-  'Design',
-  'Engineering',
-  'Product',
-  'IA & Data',
+const CATEGORY_TABS: { id: CategoryTab; label: string }[] = [
+  { id: 'Toutes', label: 'Pour vous' },
+  { id: 'Engineering', label: 'Tech' },
+  { id: 'Design', label: 'Design' },
+  { id: 'Product', label: 'Produit' },
+  { id: 'IA & Data', label: 'IA & Data' },
+  { id: 'Télétravail', label: 'Remote' },
 ];
+
+const UI_WORK_MODE_TO_API: Record<WorkMode, OfferWorkMode> = {
+  Télétravail: 'remote',
+  Hybride: 'hybrid',
+  Présentiel: 'onsite',
+};
+
+const CATEGORY_CHIPS = new Set<OfferCategory>(['Design', 'Engineering', 'Product', 'IA & Data']);
 
 export default function JobDiscoveryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { isSaved, isApplied, toggleSave, savedIds } = useJobs();
+  const { isAuthenticated } = useAuth();
+  const {
+    offers,
+    totalOffers,
+    targetMatches,
+    isLoadingOffers,
+    isRefreshingOffers,
+    isLoadingMoreOffers,
+    hasMoreOffers,
+    offersError,
+    queryOffers,
+    loadTargetOffers,
+    refreshOffers,
+    loadMoreOffers,
+    isSaved,
+    isApplied,
+    toggleSave,
+  } = useJobs();
   const {
     profile,
     recentSearches,
@@ -68,271 +93,422 @@ export default function JobDiscoveryScreen() {
     removeJobAlert,
   } = useProfile();
 
-  const firstName = profile.fullName.trim().split(' ')[0] || 'Sarah';
-
   const [query, setQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterChip>('Toutes');
+  const [activeTab, setActiveTab] = useState<CategoryTab>('Toutes');
   const [workModeFilter, setWorkModeFilter] = useState<WorkMode | 'Tous'>('Tous');
+  const [contractTypeFilter, setContractTypeFilter] = useState<OfferContractType | 'all'>('all');
+  const [locationFilter, setLocationFilter] = useState('');
   const [minSalaryFilter, setMinSalaryFilter] = useState<number>(0);
   const [sortMode, setSortMode] = useState<SortMode>('match');
-  const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const hasAdvancedFilters = workModeFilter !== 'Tous' || minSalaryFilter > 0;
+  const isFirstRender = useRef(true);
 
-  const filteredJobs = useMemo(() => {
-    const matches = JOBS.filter((job) => {
-      if (workModeFilter !== 'Tous' && job.workMode !== workModeFilter) {
-        return false;
+  const activeFiltersCount =
+    (workModeFilter !== 'Tous' ? 1 : 0) +
+    (contractTypeFilter !== 'all' ? 1 : 0) +
+    (locationFilter.length > 0 ? 1 : 0) +
+    (minSalaryFilter > 0 ? 1 : 0);
+
+  const initials =
+    (profile.fullName || 'JM')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((p) => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'JM';
+
+  // Server-side query (debounced for search input)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const params: OffersQueryParams = {
+        sort: sortMode === 'salary' ? 'salary_desc' : 'newest',
+      };
+
+      const trimmed = query.trim();
+      if (trimmed) params.search = trimmed;
+      if (CATEGORY_CHIPS.has(activeTab as OfferCategory)) {
+        params.category = activeTab as OfferCategory;
       }
-      if (minSalaryFilter > 0 && job.minSalaryK < minSalaryFilter) {
-        return false;
+      if (activeTab === 'Télétravail') {
+        params.workMode = 'remote';
+      } else if (workModeFilter !== 'Tous') {
+        params.workMode = UI_WORK_MODE_TO_API[workModeFilter];
       }
+      if (contractTypeFilter !== 'all') params.contractType = contractTypeFilter;
+      if (locationFilter) params.location = locationFilter;
+      if (minSalaryFilter > 0) params.minSalary = minSalaryFilter * 1000;
 
-      const q = query.trim().toLowerCase();
-      const matchesQuery =
-        !q ||
-        job.title.toLowerCase().includes(q) ||
-        job.company.toLowerCase().includes(q) ||
-        job.industry.toLowerCase().includes(q) ||
-        job.location.toLowerCase().includes(q) ||
-        job.overview.toLowerCase().includes(q);
+      const isPureForYou =
+        activeTab === 'Toutes' &&
+        !trimmed &&
+        workModeFilter === 'Tous' &&
+        contractTypeFilter === 'all' &&
+        !locationFilter &&
+        minSalaryFilter === 0 &&
+        sortMode === 'match';
 
-      if (!matchesQuery) return false;
-      if (activeFilter === 'Toutes') return true;
-      if (activeFilter === 'Recommandées') {
-        return profile.domains.length === 0 || profile.domains.includes(job.category);
+      if (isPureForYou && isAuthenticated) {
+        void loadTargetOffers();
+      } else {
+        void queryOffers(params);
       }
-      if (activeFilter === 'Télétravail') return job.workMode === 'Télétravail';
-      if (activeFilter === 'Favoris') return isSaved(job.id);
-      return job.category === activeFilter;
-    });
+    }, query.trim() ? 350 : 0);
 
-    return [...matches].sort((a, b) => {
-      if (sortMode === 'salary') {
-        return b.minSalaryK - a.minSalaryK;
-      }
-      return computeJobMatch(b, profile).score - computeJobMatch(a, profile).score;
-    });
-  }, [query, activeFilter, workModeFilter, minSalaryFilter, sortMode, isSaved, profile]);
+    return () => clearTimeout(timer);
+  }, [
+    query,
+    activeTab,
+    workModeFilter,
+    contractTypeFilter,
+    locationFilter,
+    minSalaryFilter,
+    sortMode,
+    isAuthenticated,
+    loadTargetOffers,
+    queryOffers,
+  ]);
 
-  const showSuccessToast = (message: string) => {
-    toast.show({
-      placement: 'top',
-      duration: 2200,
-      render: ({ id }) => (
-        <Toast
-          nativeID={`toast-${id}`}
-          className="bg-foreground flex-row items-center gap-2 rounded-full px-4 py-2.5 shadow-lg">
-          <Icon as={CheckCircle2} size="sm" className="text-secondary-fixed" />
-          <ToastTitle className="text-background text-xs font-semibold">{message}</ToastTitle>
-        </Toast>
-      ),
-    });
-  };
+  const displayedJobs = useMemo(() => {
+    if (sortMode === 'salary') {
+      return [...offers].sort((a, b) => b.minSalaryK - a.minSalaryK);
+    }
+    return offers;
+  }, [offers, sortMode]);
 
-  const handleRefresh = () => {
+  const showToast = useCallback(
+    (message: string, undoAction?: { label: string; onPress: () => void }) => {
+      toast.show({
+        placement: 'top',
+        duration: 2800,
+        render: ({ id }) => (
+          <Toast
+            nativeID={`toast-${id}`}
+            className="bg-foreground flex-row items-center gap-2 rounded-full px-4 py-2.5 shadow-lg">
+            <Icon as={CheckCircle2} size="sm" className="text-secondary-fixed" />
+            <ToastTitle className="text-background text-xs font-semibold">{message}</ToastTitle>
+            {undoAction && (
+              <Pressable
+                onPress={() => {
+                  undoAction.onPress();
+                  toast.close(id);
+                }}
+                className="pl-2">
+                <Text size="xs" bold className="text-primary-fixed underline">
+                  {undoAction.label}
+                </Text>
+              </Pressable>
+            )}
+          </Toast>
+        ),
+      });
+    },
+    [toast]
+  );
+
+  const handleRefresh = useCallback(() => {
     triggerHaptic('light');
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 600);
-  };
+    void refreshOffers();
+  }, [refreshOffers]);
 
-  const handleToggleBookmark = (job: JobListing) => {
-    const saved = toggleSave(job.id);
-    showSuccessToast(
-      saved ? `${job.company} enregistré dans vos favoris` : 'Retiré de vos favoris'
-    );
-  };
+  const handleToggleBookmark = useCallback(
+    (job: JobListing) => {
+      const saved = toggleSave(job.id);
+      if (saved) {
+        showToast(`${job.company} enregistré`);
+      } else {
+        showToast('Retiré des favoris', {
+          label: 'Annuler',
+          onPress: () => {
+            triggerHaptic('light');
+            toggleSave(job.id);
+          },
+        });
+      }
+    },
+    [toggleSave, showToast]
+  );
 
   const handleCreateAlert = () => {
     triggerHaptic('success');
-    const label = query.trim() || (workModeFilter !== 'Tous' ? workModeFilter : activeFilter);
+    const label =
+      query.trim() ||
+      locationFilter ||
+      (workModeFilter !== 'Tous' ? workModeFilter : activeTab);
     addJobAlert({
       query: label,
       workMode: workModeFilter,
       minSalaryK: minSalaryFilter,
     });
-    showSuccessToast(`Alerte créée pour « ${label} »`);
+    showToast(`Alerte créée pour « ${label} »`);
   };
 
   const resetAll = () => {
     setQuery('');
-    setActiveFilter('Toutes');
+    setActiveTab('Toutes');
     setWorkModeFilter('Tous');
+    setContractTypeFilter('all');
+    setLocationFilter('');
     setMinSalaryFilter(0);
   };
 
+  const renderItem = useCallback(
+    ({ item }: { item: JobListing }) => {
+      const serverMatch = targetMatches[item.id];
+      const computed = serverMatch ? null : computeJobMatch(item, profile);
+      return (
+        <Box className="mb-3 px-4">
+          <JobCard
+            job={item}
+            variant="discover"
+            matchScore={serverMatch?.score ?? computed?.score}
+            matchReason={serverMatch?.reasons[0] ?? computed?.reasons[0]}
+            isSaved={isSaved(item.id)}
+            isApplied={isApplied(item.id)}
+            onPress={() => {
+              if (query.trim()) addRecentSearch(query.trim());
+              router.push(`/job/${item.id}`);
+            }}
+            onToggleSave={() => handleToggleBookmark(item)}
+          />
+        </Box>
+      );
+    },
+    [targetMatches, profile, isSaved, isApplied, query, addRecentSearch, router, handleToggleBookmark]
+  );
+
+  const topPad = Platform.OS === 'web' ? 12 : Math.max(insets.top, 12);
+
   return (
     <Box className="bg-background flex-1">
-      <JobmaHeader title="Découvrir" onAvatarPress={() => router.push('/profile')} />
-
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
-        <VStack space="md" className="px-4 pt-4">
-          {/* Greeting & Intro */}
-          <VStack space="xs">
-            <HStack className="items-center" space="xs">
-              <Box className="bg-primary-fixed rounded-full px-2.5 py-1">
-                <HStack className="items-center" space="xs">
-                  <Icon as={Sparkles} size="xs" className="text-primary" />
-                  <Text size="xs" bold className="text-on-primary-fixed">
-                    {JOBS.length} offres sélectionnées
-                  </Text>
-                </HStack>
-              </Box>
-            </HStack>
-            <Heading size="2xl" bold className="text-foreground tracking-tight">
-              Bonjour {firstName}
-            </Heading>
-            <Text size="sm" className="text-muted-foreground">
-              {profile.domains.length > 0
-                ? `Sélection ${profile.domains.join(' • ')} • ${profile.minSalaryK}k+ €`
-                : 'Salaires transparents et candidature en 1 clic.'}
-            </Text>
-          </VStack>
-
-          {/* Search Input + Filter Sheet Trigger */}
-          <Input className="bg-card border-border h-12 rounded-xl px-3">
-            <InputSlot className="pr-1">
-              <InputIcon as={Search} className="text-muted-foreground" />
-            </InputSlot>
-            <InputField
-              value={query}
-              onChangeText={setQuery}
-              onSubmitEditing={() => {
-                if (query.trim()) addRecentSearch(query.trim());
-              }}
-              returnKeyType="search"
-              placeholder="Poste, entreprise, compétence ou ville..."
-              className="text-foreground text-sm"
-            />
-            {query.length > 0 && (
-              <InputSlot onPress={() => setQuery('')} className="px-1">
-                <InputIcon as={X} className="text-muted-foreground" />
-              </InputSlot>
-            )}
-            <InputSlot
-              onPress={() => {
-                triggerHaptic('light');
-                setShowFilters(true);
-              }}
-              className="border-border/70 relative border-l pl-2">
-              <InputIcon
-                as={SlidersHorizontal}
-                className={hasAdvancedFilters ? 'text-primary' : 'text-muted-foreground'}
-              />
-              {hasAdvancedFilters && (
-                <Box className="bg-primary absolute top-0 right-0 h-2 w-2 rounded-full" />
-              )}
-            </InputSlot>
-          </Input>
-
-          {/* Horizontal Filter Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-            {FILTER_CHIPS.map((chip) => {
-              const isActive = activeFilter === chip;
-              const label =
-                chip === 'Favoris' && savedIds.length > 0 ? `${chip} (${savedIds.length})` : chip;
-
-              return (
-                <Pressable
-                  key={chip}
-                  onPress={() => {
-                    triggerHaptic('light');
-                    setActiveFilter(chip);
-                  }}
-                  className={`rounded-full border px-3.5 py-2 ${
-                    isActive ? 'bg-primary-fixed border-primary' : 'bg-card border-border'
-                  }`}>
-                  <Text
-                    size="xs"
-                    bold={isActive}
-                    className={isActive ? 'text-primary' : 'text-muted-foreground'}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* Results & Sort Header */}
-          <HStack className="items-center justify-between pt-1">
-            <Text size="xs" bold className="text-muted-foreground uppercase">
-              {filteredJobs.length} {filteredJobs.length > 1 ? 'opportunités' : 'opportunité'}
-            </Text>
-
+      {/* Single Clean Startup Header: Wordmark + City Quick-Selector + Avatar + Search + Tabs */}
+      <Box
+        className="bg-card border-border/80 border-b"
+        style={{ paddingTop: topPad }}>
+        <VStack className="px-4 pt-1 pb-2.5" space="sm">
+          {/* Row 1: Brand + Location Selector + Profile Avatar */}
+          <HStack className="items-center justify-between" space="sm">
             <HStack className="items-center" space="sm">
-              {(query.trim().length > 0 || activeFilter !== 'Toutes' || hasAdvancedFilters) && (
-                <Pressable onPress={resetAll}>
-                  <Text size="xs" bold className="text-primary">
-                    Réinitialiser
-                  </Text>
-                </Pressable>
-              )}
+              <Text size="xl" bold className="text-foreground tracking-tight">
+                jobma
+                <Text size="xl" bold className="text-primary">
+                  .
+                </Text>
+              </Text>
 
               <Pressable
                 onPress={() => {
                   triggerHaptic('light');
-                  setSortMode((prev) => (prev === 'match' ? 'salary' : 'match'));
+                  setShowFilters(true);
                 }}
-                className="bg-muted flex-row items-center gap-1 rounded-full px-2.5 py-1">
-                <Icon as={ArrowUpDown} size="xs" className="text-primary" />
-                <Text size="2xs" bold className="text-foreground">
-                  {sortMode === 'match' ? 'Pertinence' : 'Salaire ↓'}
+                className="bg-muted flex-row items-center gap-1 rounded-full px-2.5 py-1 active:opacity-80">
+                <Icon as={MapPin} size="2xs" className="text-primary" />
+                <Text size="xs" bold className="text-foreground">
+                  {locationFilter || 'Maroc'}
                 </Text>
+                <Icon as={ChevronDown} size="2xs" className="text-muted-foreground" />
               </Pressable>
             </HStack>
+
+            <Pressable
+              accessibilityLabel="Mon profil"
+              onPress={() => router.push('/profile')}
+              className="active:opacity-80">
+              <Avatar className="border-border h-9 w-9 border">
+                <AvatarFallbackText>{initials}</AvatarFallbackText>
+                <AvatarImage source={{ uri: USER_PROFILE_AVATAR }} />
+              </Avatar>
+            </Pressable>
           </HStack>
 
-          {/* Job Cards */}
-          <VStack space="md">
-            {filteredJobs.length === 0 ? (
+          {/* Row 2: Crisp Pill Search Bar + Filter Trigger */}
+          <HStack className="items-center" space="sm">
+            <Input className="bg-muted/80 border-border/70 h-11 flex-1 rounded-full px-3.5">
+              <InputSlot className="pr-1.5">
+                <InputIcon as={Search} className="text-muted-foreground" />
+              </InputSlot>
+              <InputField
+                value={query}
+                onChangeText={setQuery}
+                onSubmitEditing={() => {
+                  if (query.trim()) addRecentSearch(query.trim());
+                }}
+                returnKeyType="search"
+                placeholder="Poste, compétence ou entreprise"
+                className="text-foreground text-sm"
+              />
+              {query.length > 0 && (
+                <InputSlot onPress={() => setQuery('')} className="pl-1">
+                  <InputIcon as={X} className="text-muted-foreground" />
+                </InputSlot>
+              )}
+            </Input>
+
+            <Pressable
+              accessibilityLabel="Filtres"
+              onPress={() => {
+                triggerHaptic('light');
+                setShowFilters(true);
+              }}
+              className={`relative h-11 w-11 shrink-0 items-center justify-center rounded-full border ${
+                activeFiltersCount > 0
+                  ? 'bg-foreground border-foreground'
+                  : 'bg-card border-border'
+              }`}>
+              <Icon
+                as={SlidersHorizontal}
+                size="sm"
+                className={activeFiltersCount > 0 ? 'text-background' : 'text-foreground'}
+              />
+              {activeFiltersCount > 0 && (
+                <Box className="bg-primary absolute -top-1 -right-1 h-4 min-w-4 items-center justify-center rounded-full px-1">
+                  <Text size="2xs" bold className="text-primary-foreground">
+                    {activeFiltersCount}
+                  </Text>
+                </Box>
+              )}
+            </Pressable>
+          </HStack>
+        </VStack>
+
+        {/* Row 3: Minimal Underline Category Tabs */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 20 }}>
+          {CATEGORY_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => {
+                  triggerHaptic('light');
+                  setActiveTab(tab.id);
+                }}
+                className={`border-b-2 pb-2.5 ${
+                  isActive ? 'border-foreground' : 'border-transparent'
+                }`}>
+                <Text
+                  size="sm"
+                  bold={isActive}
+                  className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </Box>
+
+      {/* Virtualized Feed */}
+      <FlatList
+        data={isLoadingOffers && offers.length === 0 ? [] : displayedJobs}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshingOffers} onRefresh={handleRefresh} />
+        }
+        onEndReached={() => {
+          if (hasMoreOffers && !isLoadingMoreOffers && !isLoadingOffers) {
+            void loadMoreOffers();
+          }
+        }}
+        onEndReachedThreshold={0.4}
+        ListHeaderComponent={
+          <VStack space="sm" className="mb-3 px-4">
+            {offersError && (
+              <Box className="bg-card border-border flex-row items-center justify-between gap-2 rounded-xl border px-3 py-2.5">
+                <Text size="xs" className="text-muted-foreground flex-1">
+                  {offersError}
+                </Text>
+                <Button variant="outline" size="sm" onPress={handleRefresh} className="rounded-lg">
+                  <ButtonIcon as={RefreshCw} />
+                  <ButtonText>Réessayer</ButtonText>
+                </Button>
+              </Box>
+            )}
+
+            <HStack className="items-center justify-between" space="sm">
+              <Text size="xs" numberOfLines={1} className="text-muted-foreground min-w-0 flex-1">
+                {totalOffers > 0
+                  ? `${totalOffers.toLocaleString('fr-FR')} offres`
+                  : `${displayedJobs.length} offres`}
+                {locationFilter ? ` à ${locationFilter}` : ' au Maroc'}
+              </Text>
+
+              <HStack className="items-center" space="md">
+                {(query.trim().length > 0 || activeTab !== 'Toutes' || activeFiltersCount > 0) && (
+                  <Pressable onPress={resetAll}>
+                    <Text size="xs" bold className="text-primary">
+                      Effacer
+                    </Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  onPress={() => {
+                    triggerHaptic('light');
+                    setSortMode((prev) => (prev === 'match' ? 'salary' : 'match'));
+                  }}
+                  className="flex-row items-center gap-1 py-0.5">
+                  <Icon as={ArrowUpDown} size="xs" className="text-muted-foreground" />
+                  <Text size="xs" bold className="text-foreground">
+                    {sortMode === 'match' ? 'Récentes' : 'Salaire'}
+                  </Text>
+                </Pressable>
+              </HStack>
+            </HStack>
+          </VStack>
+        }
+        ListEmptyComponent={
+          isLoadingOffers ? (
+            <VStack space="md" className="px-4">
+              <JobCardSkeleton />
+              <JobCardSkeleton />
+              <JobCardSkeleton />
+            </VStack>
+          ) : (
+            <Box className="px-4">
               <EmptyState
                 icon={Briefcase}
                 tone="muted"
                 title="Aucune offre trouvée"
-                description="Essayez de modifier votre recherche ou vos filtres actifs."
-                actionLabel="Voir toutes les offres"
+                description="Essayez un autre mot-clé ou élargissez vos filtres."
+                actionLabel="Réinitialiser"
                 onAction={resetAll}
               />
-            ) : (
-              filteredJobs.map((job, index) => (
-                <Animated.View
-                  key={job.id}
-                  entering={FadeInDown.delay(index * 55).duration(280)}
-                  layout={LinearTransition.springify()}>
-                  <JobCard
-                    job={job}
-                    variant="discover"
-                    matchScore={computeJobMatch(job, profile).score}
-                    isSaved={isSaved(job.id)}
-                    isApplied={isApplied(job.id)}
-                    onPress={() => {
-                      if (query.trim()) addRecentSearch(query.trim());
-                      router.push(`/job/${job.id}`);
-                    }}
-                    onToggleSave={() => handleToggleBookmark(job)}
-                  />
-                </Animated.View>
-              ))
-            )}
-          </VStack>
-        </VStack>
-      </ScrollView>
+            </Box>
+          )
+        }
+        ListFooterComponent={
+          isLoadingMoreOffers ? (
+            <Box className="items-center py-4">
+              <ActivityIndicator size="small" />
+            </Box>
+          ) : undefined
+        }
+      />
 
       <FilterSheet
         visible={showFilters}
         workMode={workModeFilter}
+        contractType={contractTypeFilter}
+        location={locationFilter}
         minSalaryK={minSalaryFilter}
         recentSearches={recentSearches}
         savedAlerts={savedAlerts}
         onChangeWorkMode={setWorkModeFilter}
+        onChangeContractType={setContractTypeFilter}
+        onChangeLocation={setLocationFilter}
         onChangeMinSalary={setMinSalaryFilter}
         onSelectSearch={setQuery}
         onClearSearches={clearRecentSearches}

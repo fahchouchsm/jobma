@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
@@ -12,13 +12,17 @@ import {
   Eye,
   FileText,
   Globe,
+  LogIn,
+  LogOut,
   Mail,
   MapPin,
   MoonStar,
+  Pencil,
   RotateCcw,
   ShieldCheck,
   Sparkles,
   Sun,
+  Trash2,
   UploadCloud,
 } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
@@ -35,6 +39,8 @@ import { VStack } from '@/components/ui/vstack';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { JobmaHeader } from '@/components/jobma-header';
 import { AnimatedProgressBar } from '@/components/animated/animated-progress';
+import { EditProfileSheet } from '@/components/profile/edit-profile-sheet';
+import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
 import { useProfile } from '@/context/profile-context';
 import { USER_PROFILE_AVATAR } from '@/data/jobs';
@@ -56,11 +62,11 @@ function SettingToggleRow({
   return (
     <Pressable onPress={onToggle} className="py-2.5 active:opacity-80">
       <HStack className="items-center justify-between" space="md">
-        <HStack className="flex-1 items-center" space="md">
+        <HStack className="min-w-0 flex-1 items-center" space="md">
           <Box className="bg-muted h-9 w-9 shrink-0 items-center justify-center rounded-xl">
             <Icon as={icon} size="sm" className="text-primary" />
           </Box>
-          <VStack className="flex-1">
+          <VStack className="min-w-0 flex-1">
             <Text size="sm" bold className="text-foreground">
               {title}
             </Text>
@@ -71,7 +77,7 @@ function SettingToggleRow({
         </HStack>
 
         <Box
-          className={`h-6 w-11 justify-center rounded-full p-0.5 ${
+          className={`h-6 w-11 shrink-0 justify-center rounded-full p-0.5 ${
             enabled ? 'bg-primary' : 'bg-muted'
           }`}>
           <Box className={`bg-card h-5 w-5 rounded-full ${enabled ? 'self-end' : 'self-start'}`} />
@@ -84,10 +90,21 @@ function SettingToggleRow({
 export default function ProfileScreen() {
   const router = useRouter();
   const { theme } = useUniwind();
+  const { user, isAuthenticated, logout } = useAuth();
   const { savedIds, appliedIds } = useJobs();
-  const { profile, settings, savedAlerts, updateProfile, updateSettings, resetOnboarding } =
-    useProfile();
+  const {
+    profile,
+    settings,
+    savedAlerts,
+    isUploadingCv,
+    updateProfile,
+    updateSettings,
+    uploadCv,
+    removeCv,
+    resetOnboarding,
+  } = useProfile();
   const isDark = theme === 'dark';
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
   const initials = (profile.fullName || 'JM')
     .split(' ')
@@ -124,15 +141,17 @@ export default function ProfileScreen() {
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      triggerHaptic('success');
-      updateProfile({
-        cvFile: {
+      try {
+        await uploadCv({
           name: asset.name,
           size: asset.size,
           uri: asset.uri,
           mimeType: asset.mimeType,
-        },
-      });
+        });
+        triggerHaptic('success');
+      } catch {
+        // Handled silently or retryable
+      }
     }
   };
 
@@ -152,6 +171,51 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={FadeInDown.duration(300)}>
           <VStack space="md" className="px-4 pt-4">
+            {/* Account / Cloud Sync Banner */}
+            <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+              {isAuthenticated && user ? (
+                <HStack className="items-center justify-between" space="sm">
+                  <VStack className="min-w-0 flex-1">
+                    <Text size="xs" bold className="text-secondary">
+                      Compte synchronisé
+                    </Text>
+                    <Text size="sm" numberOfLines={1} className="text-foreground font-medium">
+                      {user.email}
+                    </Text>
+                  </VStack>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onPress={() => {
+                      triggerHaptic('light');
+                      void logout();
+                    }}
+                    className="rounded-xl">
+                    <ButtonIcon as={LogOut} />
+                    <ButtonText>Déconnexion</ButtonText>
+                  </Button>
+                </HStack>
+              ) : (
+                <HStack className="items-center justify-between" space="sm">
+                  <VStack className="min-w-0 flex-1">
+                    <Text size="sm" bold className="text-foreground">
+                      Synchronisez votre profil
+                    </Text>
+                    <Text size="xs" className="text-muted-foreground">
+                      CV, favoris, alertes et offres ciblées dans le cloud.
+                    </Text>
+                  </VStack>
+                  <Button
+                    size="sm"
+                    onPress={() => router.push('/auth/login')}
+                    className="rounded-xl">
+                    <ButtonIcon as={LogIn} />
+                    <ButtonText>Connexion</ButtonText>
+                  </Button>
+                </HStack>
+              )}
+            </Card>
+
             {/* Profile Identity Card */}
             <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
               <VStack space="md">
@@ -160,7 +224,7 @@ export default function ProfileScreen() {
                     <AvatarFallbackText>{initials}</AvatarFallbackText>
                     <AvatarImage source={{ uri: USER_PROFILE_AVATAR }} />
                   </Avatar>
-                  <VStack space="xs" className="flex-1">
+                  <VStack space="xs" className="min-w-0 flex-1">
                     <Heading size="lg" bold className="text-foreground">
                       {profile.fullName}
                     </Heading>
@@ -168,8 +232,8 @@ export default function ProfileScreen() {
                       {profile.headline} • {profile.experienceLevel}
                     </Text>
                     <HStack className="items-center" space="xs">
-                      <Icon as={MapPin} size="xs" className="text-primary" />
-                      <Text size="xs" className="text-muted-foreground">
+                      <Icon as={MapPin} size="xs" className="text-primary shrink-0" />
+                      <Text size="xs" className="text-muted-foreground flex-1">
                         {profile.location}
                       </Text>
                     </HStack>
@@ -181,7 +245,7 @@ export default function ProfileScreen() {
                     <HStack className="items-center" space="xs">
                       <Icon as={Banknote} size="xs" className="text-secondary" />
                       <Text size="xs" bold className="text-on-secondary-container">
-                        {profile.minSalaryK}k+ € / an
+                        {profile.minSalaryK}k+ MAD / mois
                       </Text>
                     </HStack>
                   </Box>
@@ -201,8 +265,8 @@ export default function ProfileScreen() {
                 {profile.oneClickApplyEnabled && (
                   <Box className="bg-secondary-container/50 rounded-xl px-3 py-2">
                     <HStack className="items-center" space="xs">
-                      <Icon as={CheckCircle2} size="sm" className="text-secondary" />
-                      <Text size="xs" bold className="text-on-secondary-container">
+                      <Icon as={CheckCircle2} size="sm" className="text-secondary shrink-0" />
+                      <Text size="xs" bold className="text-on-secondary-container flex-1">
                         Profil prêt pour la candidature en 1 clic
                       </Text>
                     </HStack>
@@ -252,20 +316,39 @@ export default function ProfileScreen() {
 
                 {profile.cvFile ? (
                   <HStack className="bg-muted items-center rounded-xl p-3" space="sm">
-                    <Icon as={FileText} size="md" className="text-secondary" />
+                    <Icon as={FileText} size="md" className="text-secondary shrink-0" />
                     <VStack className="min-w-0 flex-1">
                       <Text size="xs" bold isTruncated className="text-foreground">
                         {profile.cvFile.name}
                       </Text>
                       <Text size="2xs" className="text-muted-foreground">
-                        Utilisé automatiquement pour 1-clic
+                        {isUploadingCv
+                          ? 'Envoi vers le cloud...'
+                          : isAuthenticated
+                            ? 'Synchronisé dans le cloud'
+                            : 'Utilisé automatiquement pour 1-clic'}
                       </Text>
                     </VStack>
+                    <Pressable
+                      accessibilityLabel="Supprimer le CV"
+                      onPress={() => {
+                        triggerHaptic('light');
+                        void removeCv();
+                      }}
+                      className="p-1.5">
+                      <Icon as={Trash2} size="sm" className="text-destructive" />
+                    </Pressable>
                   </HStack>
                 ) : (
-                  <Button variant="outline" size="sm" onPress={handlePickCv}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    isDisabled={isUploadingCv}
+                    onPress={handlePickCv}>
                     <ButtonIcon as={UploadCloud} />
-                    <ButtonText>Importer un CV (PDF, DOCX)</ButtonText>
+                    <ButtonText>
+                      {isUploadingCv ? 'Envoi en cours...' : 'Importer un CV (PDF, DOCX)'}
+                    </ButtonText>
                   </Button>
                 )}
               </VStack>
@@ -396,22 +479,22 @@ export default function ProfileScreen() {
             {/* Appearance Toggle */}
             <Pressable onPress={toggleTheme} className="active:opacity-90">
               <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
-                <HStack className="items-center justify-between">
-                  <HStack className="items-center" space="md">
-                    <Box className="bg-muted h-10 w-10 items-center justify-center rounded-xl">
+                <HStack className="items-center justify-between" space="sm">
+                  <HStack className="min-w-0 flex-1 items-center" space="md">
+                    <Box className="bg-muted h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                       <Icon as={isDark ? Sun : MoonStar} size="md" className="text-primary" />
                     </Box>
-                    <VStack>
+                    <VStack className="min-w-0 flex-1">
                       <Text size="sm" bold className="text-foreground">
                         Apparence
                       </Text>
-                      <Text size="xs" className="text-muted-foreground">
-                        {isDark ? 'Mode sombre Instagram actif' : 'Mode clair JobPulse actif'}
+                      <Text size="xs" className="text-muted-foreground" numberOfLines={1}>
+                        {isDark ? 'Mode sombre actif' : 'Mode clair actif'}
                       </Text>
                     </VStack>
                   </HStack>
 
-                  <Box className="bg-primary-fixed rounded-full px-3 py-1.5">
+                  <Box className="bg-primary-fixed shrink-0 rounded-full px-3 py-1.5">
                     <Text size="xs" bold className="text-on-primary-fixed">
                       Basculer
                     </Text>
@@ -420,18 +503,38 @@ export default function ProfileScreen() {
               </Card>
             </Pressable>
 
-            {/* Relaunch Onboarding */}
-            <Button
-              variant="outline"
-              size="lg"
-              onPress={handleRelaunchOnboarding}
-              className="rounded-xl">
-              <ButtonIcon as={RotateCcw} />
-              <ButtonText>Modifier mon profil & CV</ButtonText>
-            </Button>
+            {/* Edit Profile In-Place + Secondary Onboarding Relaunch */}
+            <VStack space="sm">
+              <Button
+                size="default"
+                onPress={() => {
+                  triggerHaptic('light');
+                  setShowEditProfile(true);
+                }}
+                className="rounded-xl">
+                <ButtonIcon as={Pencil} />
+                <ButtonText className="font-bold">Modifier mon profil</ButtonText>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={handleRelaunchOnboarding}
+                className="rounded-xl">
+                <ButtonIcon as={RotateCcw} />
+                <ButtonText>Relancer l&apos;assistant de configuration</ButtonText>
+              </Button>
+            </VStack>
           </VStack>
         </Animated.View>
       </ScrollView>
+
+      <EditProfileSheet
+        visible={showEditProfile}
+        profile={profile}
+        onSave={updateProfile}
+        onClose={() => setShowEditProfile(false)}
+      />
     </Box>
   );
 }

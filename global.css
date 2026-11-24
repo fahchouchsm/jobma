@@ -7,32 +7,32 @@
 @layer theme {
   :root {
     @variant light {
-      --primary: 0 40 142;
+      --primary: 29 78 216;
       --primary-foreground: 255 255 255;
       --primary-container: 30 64 175;
-      --primary-fixed: 221 225 255;
-      --on-primary-fixed: 0 20 83;
-      --secondary: 0 108 73;
+      --primary-fixed: 239 246 255;
+      --on-primary-fixed: 30 64 175;
+      --secondary: 5 150 105;
       --secondary-foreground: 255 255 255;
-      --secondary-container: 108 248 187;
-      --on-secondary-container: 0 113 77;
-      --secondary-fixed: 111 251 190;
-      --background: 250 248 255;
-      --foreground: 19 27 46;
+      --secondary-container: 236 253 245;
+      --on-secondary-container: 6 95 70;
+      --secondary-fixed: 209 250 229;
+      --background: 248 249 251;
+      --foreground: 15 23 42;
       --card: 255 255 255;
-      --card-foreground: 19 27 46;
+      --card-foreground: 15 23 42;
       --popover: 255 255 255;
-      --popover-foreground: 19 27 46;
-      --muted: 242 243 255;
-      --muted-foreground: 68 70 83;
-      --accent: 234 237 255;
-      --accent-foreground: 19 27 46;
-      --destructive: 186 26 26;
+      --popover-foreground: 15 23 42;
+      --muted: 241 245 249;
+      --muted-foreground: 71 85 105;
+      --accent: 238 242 255;
+      --accent-foreground: 15 23 42;
+      --destructive: 220 38 38;
       --border: 226 232 240;
       --input: 203 213 225;
-      --ring: 30 64 175;
-      --warning: 245 158 11;
-      --tertiary: 60 76 97;
+      --ring: 29 78 216;
+      --warning: 217 119 6;
+      --tertiary: 71 85 105;
     }
 
     @variant dark {

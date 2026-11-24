@@ -1,9 +1,9 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUniwind } from 'uniwind';
-import { Bookmark, CheckCheck, Zap } from 'lucide-react-native';
+import { Bookmark, CheckCheck, ExternalLink, Zap } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
@@ -14,6 +14,8 @@ interface JobApplyBarProps {
   isSaved: boolean;
   isApplied: boolean;
   isApplying: boolean;
+  sourceUrl?: string;
+  sourceSite?: string;
   onToggleSave: () => void;
   onApply: () => void;
 }
@@ -22,6 +24,8 @@ export function JobApplyBar({
   isSaved,
   isApplied,
   isApplying,
+  sourceUrl,
+  sourceSite,
   onToggleSave,
   onApply,
 }: JobApplyBarProps) {
@@ -44,6 +48,18 @@ export function JobApplyBar({
           className={isSaved ? 'text-primary fill-primary' : 'text-muted-foreground'}
         />
       </ScalePressable>
+
+      {sourceUrl && (
+        <ScalePressable
+          accessibilityLabel={
+            sourceSite ? `Ouvrir sur ${sourceSite}` : "Ouvrir l'annonce originale"
+          }
+          onPress={() => void Linking.openURL(sourceUrl)}
+          scaleTo={0.86}
+          className="bg-muted h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+          <Icon as={ExternalLink} size="md" className="text-primary" />
+        </ScalePressable>
+      )}
 
       <Button
         size="lg"

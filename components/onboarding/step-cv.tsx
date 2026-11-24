@@ -19,7 +19,7 @@ import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import type { CandidateProfile } from '@/context/profile-context';
+import { type CandidateProfile, useProfile } from '@/context/profile-context';
 import { triggerHaptic } from '@/lib/haptics';
 
 interface StepCvProps {
@@ -35,6 +35,7 @@ function formatBytes(bytes?: number): string {
 }
 
 export function StepCv({ profile, onChange }: StepCvProps) {
+  const { uploadCv, removeCv } = useProfile();
   const [isPicking, setIsPicking] = useState(false);
 
   const handlePickCv = async () => {
@@ -51,15 +52,13 @@ export function StepCv({ profile, onChange }: StepCvProps) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        triggerHaptic('success');
-        onChange({
-          cvFile: {
-            name: asset.name,
-            size: asset.size,
-            uri: asset.uri,
-            mimeType: asset.mimeType,
-          },
+        await uploadCv({
+          name: asset.name,
+          size: asset.size,
+          uri: asset.uri,
+          mimeType: asset.mimeType,
         });
+        triggerHaptic('success');
       }
     } finally {
       setIsPicking(false);
@@ -103,7 +102,7 @@ export function StepCv({ profile, onChange }: StepCvProps) {
                 accessibilityLabel="Supprimer le CV"
                 onPress={() => {
                   triggerHaptic('light');
-                  onChange({ cvFile: null });
+                  void removeCv();
                 }}
                 className="bg-muted h-9 w-9 items-center justify-center rounded-full">
                 <Icon as={Trash2} size="sm" className="text-destructive" />

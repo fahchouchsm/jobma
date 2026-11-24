@@ -137,7 +137,7 @@ export function ApplicationDetailSheet({
                         triggerHaptic('light');
                         onUpdateStatus(job.id, stage);
                       }}
-                      className={`flex-1 items-center rounded-lg border py-2 ${
+                      className={`flex-1 items-center rounded-lg border px-1 py-2 ${
                         active
                           ? 'bg-secondary-container/60 border-secondary'
                           : 'bg-muted border-transparent'
@@ -145,6 +145,7 @@ export function ApplicationDetailSheet({
                       <Text
                         size="2xs"
                         bold={active}
+                        numberOfLines={1}
                         className={
                           active ? 'text-on-secondary-container' : 'text-muted-foreground'
                         }>

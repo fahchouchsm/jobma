@@ -10,38 +10,70 @@ import { Icon } from '@/components/ui/icon';
 import { Pressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
+import { Toast, ToastTitle, useToast } from '@/components/ui/toast';
 import { VStack } from '@/components/ui/vstack';
 import { EmptyState } from '@/components/empty-state';
 import { JobCard } from '@/components/job-card';
 import { JobmaHeader } from '@/components/jobma-header';
 import { type ApplicationStatus, useJobs } from '@/context/jobs-context';
-import { JOBS } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 
 const STATUS_STAGES: ApplicationStatus[] = ['Envoyée', 'En cours', 'Entretien', 'Offre'];
 
 export default function ApplicationsScreen() {
   const router = useRouter();
+  const toast = useToast();
   const {
+    offers,
+    getOfferById,
     appliedIds,
     applications,
     isSaved,
     updateApplicationStatus,
     updateApplicationNote,
     withdrawApplication,
+    restoreApplication,
   } = useJobs();
+
+  const handleWithdrawWithUndo = (jobId: string) => {
+    const removed = withdrawApplication(jobId);
+    if (!removed) return;
+    toast.show({
+      placement: 'top',
+      duration: 3200,
+      render: ({ id }) => (
+        <Toast
+          nativeID={`toast-${id}`}
+          className="bg-foreground flex-row items-center gap-3 rounded-full px-4 py-2.5 shadow-lg">
+          <ToastTitle className="text-background text-xs font-semibold">
+            Candidature retirée
+          </ToastTitle>
+          <Pressable
+            onPress={() => {
+              triggerHaptic('light');
+              restoreApplication(removed);
+              toast.close(id);
+            }}>
+            <Text size="xs" bold className="text-primary-fixed underline">
+              Annuler
+            </Text>
+          </Pressable>
+        </Toast>
+      ),
+    });
+  };
 
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'Toutes'>('Toutes');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   const selectedJob = useMemo(
-    () => (selectedJobId ? JOBS.find((item) => item.id === selectedJobId) ?? null : null),
-    [selectedJobId]
+    () => (selectedJobId ? getOfferById(selectedJobId) ?? null : null),
+    [selectedJobId, getOfferById]
   );
   const selectedApplication = selectedJobId ? applications[selectedJobId] ?? null : null;
 
   const appliedJobs = useMemo(() => {
-    return JOBS.filter((job) => {
+    return offers.filter((job) => {
       if (!appliedIds.includes(job.id)) return false;
       if (statusFilter === 'Toutes') return true;
       return (applications[job.id]?.status ?? 'Envoyée') === statusFilter;
@@ -54,7 +86,7 @@ export default function ApplicationsScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}>
         <VStack space="md" className="px-4 pt-4">
           <VStack space="xs">
@@ -149,7 +181,7 @@ export default function ApplicationsScreen() {
                             <Pressable
                               onPress={() => {
                                 triggerHaptic('light');
-                                withdrawApplication(job.id);
+                                handleWithdrawWithUndo(job.id);
                               }}
                               className="bg-muted flex-row items-center gap-1 rounded-full px-2 py-0.5">
                               <Icon as={Trash2} size="xs" className="text-destructive" />
@@ -169,7 +201,7 @@ export default function ApplicationsScreen() {
                                     triggerHaptic('light');
                                     updateApplicationStatus(job.id, stage);
                                   }}
-                                  className={`flex-1 items-center rounded-lg border py-1.5 ${
+                                  className={`flex-1 items-center rounded-lg border px-1 py-1.5 ${
                                     active
                                       ? 'bg-secondary-container/60 border-secondary'
                                       : 'bg-muted border-transparent'
@@ -177,6 +209,7 @@ export default function ApplicationsScreen() {
                                   <Text
                                     size="2xs"
                                     bold={active}
+                                    numberOfLines={1}
                                     className={
                                       active
                                         ? 'text-on-secondary-container'
@@ -224,7 +257,7 @@ export default function ApplicationsScreen() {
         onClose={() => setSelectedJobId(null)}
         onUpdateStatus={updateApplicationStatus}
         onUpdateNote={updateApplicationNote}
-        onWithdraw={withdrawApplication}
+        onWithdraw={handleWithdrawWithUndo}
         onViewJob={(jobId) => router.push(`/job/${jobId}`)}
       />
     </Box>

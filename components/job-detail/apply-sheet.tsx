@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import { KeyboardAvoidingView, Modal, Platform } from 'react-native';
+import { KeyboardAvoidingView, Linking, Modal, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FileText, Send, UploadCloud, X, Zap } from 'lucide-react-native';
+import { ExternalLink, FileText, Send, UploadCloud, X, Zap } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -26,6 +26,8 @@ interface ApplySheetProps {
   onClose: () => void;
   onConfirm: (note: string) => void;
   onAttachCv?: (cv: CvAttachment) => void;
+  sourceSite?: string;
+  sourceUrl?: string;
 }
 
 export function ApplySheet({
@@ -36,6 +38,8 @@ export function ApplySheet({
   onClose,
   onConfirm,
   onAttachCv,
+  sourceSite,
+  sourceUrl,
 }: ApplySheetProps) {
   const insets = useSafeAreaInsets();
   const [note, setNote] = useState('');
@@ -187,15 +191,15 @@ export function ApplySheet({
             <HStack space="sm" className="pt-1">
               <Button
                 variant="outline"
-                size="lg"
+                size="default"
                 onPress={handleSafeClose}
                 isDisabled={isSubmitting}
-                className="rounded-xl">
+                className="rounded-xl px-4">
                 <ButtonText>Annuler</ButtonText>
               </Button>
 
               <Button
-                size="lg"
+                size="default"
                 isDisabled={isSubmitting}
                 onPress={() => onConfirm(note.trim())}
                 className="flex-1 rounded-xl">
@@ -207,11 +211,25 @@ export function ApplySheet({
                 ) : (
                   <>
                     <ButtonIcon as={Send} />
-                    <ButtonText className="font-bold">Envoyer ma candidature</ButtonText>
+                    <ButtonText className="font-bold">Envoyer</ButtonText>
                   </>
                 )}
               </Button>
             </HStack>
+
+            {sourceUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                isDisabled={isSubmitting}
+                onPress={() => void Linking.openURL(sourceUrl)}
+                className="rounded-xl">
+                <ButtonIcon as={ExternalLink} />
+                <ButtonText>
+                  Voir l&apos;annonce originale{sourceSite ? ` (${sourceSite})` : ''}
+                </ButtonText>
+              </Button>
+            )}
           </VStack>
         </Box>
       </KeyboardAvoidingView>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Share } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -36,12 +36,14 @@ import { JobHeroCard } from '@/components/job-detail/job-hero-card';
 import { JobMetricsRow } from '@/components/job-detail/job-metrics-row';
 import { type JobDetailTabId, JobSegmentedTabs } from '@/components/job-detail/job-segmented-tabs';
 import { JobmaHeader } from '@/components/jobma-header';
+import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
 import { useProfile } from '@/context/profile-context';
-import { JOBS, type JobBenefit, type JobQualification } from '@/data/jobs';
+import { JOBS, type JobBenefit, type JobListing, type JobQualification } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 import { computeJobMatch } from '@/lib/job-match';
-import { submitApplication } from '@/services/jobs-service';
+import { fetchOfferSource, fetchSimilarOffers, submitApplication } from '@/services/jobs-service';
+import type { OfferSourceResponse } from '@/types/offer';
 
 const QUALIFICATION_ICON_MAP: Record<JobQualification['icon'], typeof Award> = {
   award: Award,
@@ -61,20 +63,49 @@ export default function JobDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { isSaved, isApplied, toggleSave, markApplied } = useJobs();
-  const { profile, updateProfile } = useProfile();
+  const { isAuthenticated } = useAuth();
+  const { offers, getOfferById, ensureOfferLoaded, isSaved, isApplied, toggleSave, markApplied } =
+    useJobs();
+  const { profile, uploadCv } = useProfile();
 
-  const job = JOBS.find((item) => item.id === id) ?? JOBS[0];
+  const job = getOfferById(id) ?? offers[0] ?? JOBS[0];
   const match = computeJobMatch(job, profile);
-  const similarJobs = JOBS.filter(
-    (item) => item.id !== job.id && item.category === job.category
-  ).slice(0, 3);
+  const [serverSimilarJobs, setServerSimilarJobs] = useState<JobListing[]>([]);
+  const similarJobs =
+    serverSimilarJobs.length > 0
+      ? serverSimilarJobs.slice(0, 3)
+      : offers.filter((item) => item.id !== job.id && item.category === job.category).slice(0, 3);
+
+  useEffect(() => {
+    if (id && !getOfferById(id)) {
+      void ensureOfferLoaded(id);
+    }
+  }, [id, getOfferById, ensureOfferLoaded]);
   const saved = isSaved(job.id);
   const applied = isApplied(job.id);
 
   const [activeTab, setActiveTab] = useState<JobDetailTabId>('overview');
   const [isApplying, setIsApplying] = useState(false);
   const [showApplySheet, setShowApplySheet] = useState(false);
+  const [offerSource, setOfferSource] = useState<OfferSourceResponse | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!job.id) return;
+    fetchOfferSource(job.id)
+      .then((src) => {
+        if (mounted) setOfferSource(src);
+      })
+      .catch(() => {});
+    fetchSimilarOffers(job.id, 6)
+      .then((items) => {
+        if (mounted && items.length > 0) setServerSimilarJobs(items);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [job.id]);
 
   const showToast = (message: string) => {
     toast.show({
@@ -127,11 +158,15 @@ export default function JobDetailScreen() {
     triggerHaptic('medium');
     setIsApplying(true);
     try {
-      await submitApplication({
-        jobId: job.id,
-        cvName: profile.cvFile?.name,
-        note: note || undefined,
-      });
+      await submitApplication(
+        {
+          jobId: job.id,
+          cvId: profile.cvFile?.id,
+          cvName: profile.cvFile?.name,
+          note: note || undefined,
+        },
+        isAuthenticated
+      );
       setShowApplySheet(false);
       markApplied(job.id, {
         cvName: profile.cvFile?.name,
@@ -163,14 +198,18 @@ export default function JobDetailScreen() {
 
       <ScrollView
         className="flex-1"
-        stickyHeaderIndices={[2]}
+        stickyHeaderIndices={[3]}
         contentContainerStyle={{
           paddingTop: 16,
-          paddingBottom: 24,
+          paddingBottom: 28,
         }}
         showsVerticalScrollIndicator={false}>
         {/* 0: Hero Card */}
-        <JobHeroCard job={job} />
+        <JobHeroCard
+          job={job}
+          sourceSite={offerSource?.sourceSite}
+          sourceUrl={offerSource?.sourceUrl}
+        />
 
         {/* Match Score Banner */}
         <Box className="mb-3 px-4">
@@ -230,34 +269,36 @@ export default function JobDetailScreen() {
                   </VStack>
                 </Card>
 
-                <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
-                  <VStack space="sm">
-                    <HStack className="items-center" space="sm">
-                      <Box className="bg-secondary-container/60 h-7 w-7 items-center justify-center rounded-lg">
-                        <Icon as={CheckCircle2} size="sm" className="text-secondary" />
-                      </Box>
-                      <Heading size="sm" bold className="text-foreground">
-                        Votre impact et responsabilités
-                      </Heading>
-                    </HStack>
+                {job.responsibilities.length > 0 && (
+                  <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+                    <VStack space="sm">
+                      <HStack className="items-center" space="sm">
+                        <Box className="bg-secondary-container/60 h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                          <Icon as={CheckCircle2} size="sm" className="text-secondary" />
+                        </Box>
+                        <Heading size="sm" bold className="text-foreground flex-1">
+                          Votre impact et responsabilités
+                        </Heading>
+                      </HStack>
 
-                    <VStack space="md" className="pt-1">
-                      {job.responsibilities.map((item) => (
-                        <HStack key={item.id} className="items-start" space="sm">
-                          <Box className="bg-secondary-container/60 mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded-full">
-                            <Icon as={Check} size="xs" className="text-secondary" />
-                          </Box>
-                          <Text size="sm" className="text-muted-foreground flex-1 leading-snug">
-                            <Text size="sm" bold className="text-foreground">
-                              {item.title}{' '}
+                      <VStack space="md" className="pt-1">
+                        {job.responsibilities.map((item) => (
+                          <HStack key={item.id} className="items-start" space="sm">
+                            <Box className="bg-secondary-container/60 mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                              <Icon as={Check} size="xs" className="text-secondary" />
+                            </Box>
+                            <Text size="sm" className="text-muted-foreground flex-1 leading-snug">
+                              <Text size="sm" bold className="text-foreground">
+                                {item.title}{' '}
+                              </Text>
+                              {item.description}
                             </Text>
-                            {item.description}
-                          </Text>
-                        </HStack>
-                      ))}
+                          </HStack>
+                        ))}
+                      </VStack>
                     </VStack>
-                  </VStack>
-                </Card>
+                  </Card>
+                )}
               </VStack>
             )}
 
@@ -274,24 +315,30 @@ export default function JobDetailScreen() {
                   </HStack>
 
                   <VStack space="sm" className="pt-1">
-                    {job.qualifications.map((qual) => {
-                      const QualIcon = QUALIFICATION_ICON_MAP[qual.icon];
-                      return (
-                        <Box key={qual.id} className="bg-muted rounded-xl p-3">
-                          <VStack space="xs">
-                            <HStack className="items-center" space="xs">
-                              <Icon as={QualIcon} size="sm" className="text-primary" />
-                              <Text size="xs" bold className="text-foreground">
-                                {qual.title}
+                    {job.qualifications.length === 0 ? (
+                      <Text size="xs" className="text-muted-foreground">
+                        Consultez l&apos;aperçu du poste pour les qualifications détaillées.
+                      </Text>
+                    ) : (
+                      job.qualifications.map((qual) => {
+                        const QualIcon = QUALIFICATION_ICON_MAP[qual.icon];
+                        return (
+                          <Box key={qual.id} className="bg-muted rounded-xl p-3">
+                            <VStack space="xs">
+                              <HStack className="items-start" space="xs">
+                                <Icon as={QualIcon} size="sm" className="text-primary mt-0.5 shrink-0" />
+                                <Text size="xs" bold className="text-foreground flex-1 leading-snug">
+                                  {qual.title}
+                                </Text>
+                              </HStack>
+                              <Text size="xs" className="text-muted-foreground leading-relaxed">
+                                {qual.description}
                               </Text>
-                            </HStack>
-                            <Text size="xs" className="text-muted-foreground leading-relaxed">
-                              {qual.description}
-                            </Text>
-                          </VStack>
-                        </Box>
-                      );
-                    })}
+                            </VStack>
+                          </Box>
+                        );
+                      })
+                    )}
                   </VStack>
                 </VStack>
               </Card>
@@ -309,31 +356,37 @@ export default function JobDetailScreen() {
                     </Heading>
                   </HStack>
 
-                  <Box className="flex-row flex-wrap justify-between gap-y-2 pt-1">
-                    {job.benefits.map((benefit) => {
-                      const BenefitIcon = BENEFIT_ICON_MAP[benefit.icon];
-                      const iconColorClass =
-                        benefit.accent === 'secondary'
-                          ? 'text-secondary'
-                          : benefit.accent === 'primary'
-                            ? 'text-primary'
-                            : 'text-tertiary';
+                  {job.benefits.length === 0 ? (
+                    <Text size="xs" className="text-muted-foreground pt-1">
+                      Les avantages seront précisés lors de l&apos;entretien avec {job.company}.
+                    </Text>
+                  ) : (
+                    <Box className="flex-row flex-wrap justify-between gap-y-2 pt-1">
+                      {job.benefits.map((benefit) => {
+                        const BenefitIcon = BENEFIT_ICON_MAP[benefit.icon];
+                        const iconColorClass =
+                          benefit.accent === 'secondary'
+                            ? 'text-secondary'
+                            : benefit.accent === 'primary'
+                              ? 'text-primary'
+                              : 'text-tertiary';
 
-                      return (
-                        <Box key={benefit.id} className="bg-muted w-[48.5%] rounded-xl p-3">
-                          <VStack space="xs">
-                            <Icon as={BenefitIcon} size="lg" className={iconColorClass} />
-                            <Text size="xs" bold className="text-foreground">
-                              {benefit.title}
-                            </Text>
-                            <Text size="xs" className="text-muted-foreground">
-                              {benefit.description}
-                            </Text>
-                          </VStack>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                        return (
+                          <Box key={benefit.id} className="bg-muted w-[48.5%] rounded-xl p-3">
+                            <VStack space="xs">
+                              <Icon as={BenefitIcon} size="lg" className={iconColorClass} />
+                              <Text size="xs" bold className="text-foreground">
+                                {benefit.title}
+                              </Text>
+                              <Text size="xs" className="text-muted-foreground">
+                                {benefit.description}
+                              </Text>
+                            </VStack>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
                 </VStack>
               </Card>
             )}
@@ -341,55 +394,59 @@ export default function JobDetailScreen() {
             {activeTab === 'company' && (
               <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
                 <VStack space="md">
-                  <HStack className="items-center justify-between">
-                    <HStack className="items-center" space="sm">
-                      <Box className="bg-primary-fixed/70 h-7 w-7 items-center justify-center rounded-lg">
+                  <HStack className="items-start justify-between" space="sm">
+                    <HStack className="min-w-0 flex-1 items-center" space="sm">
+                      <Box className="bg-primary-fixed/70 h-7 w-7 shrink-0 items-center justify-center rounded-lg">
                         <Icon as={Building2} size="sm" className="text-primary" />
                       </Box>
-                      <Heading size="sm" bold className="text-foreground">
+                      <Heading size="sm" bold numberOfLines={2} className="text-foreground flex-1">
                         À propos de {job.company}
                       </Heading>
                     </HStack>
 
-                    <Box className="bg-accent rounded-full px-2.5 py-1">
-                      <HStack className="items-center" space="xs">
-                        <Icon as={Star} size="xs" className="text-warning fill-warning" />
-                        <Text size="2xs" bold className="text-foreground">
-                          {job.companyRating}
-                        </Text>
-                        <Text size="2xs" className="text-muted-foreground">
-                          {job.companyReviews}
-                        </Text>
-                      </HStack>
-                    </Box>
+                    {Boolean(job.companyRating) && (
+                      <Box className="bg-accent shrink-0 rounded-full px-2.5 py-1">
+                        <HStack className="items-center" space="xs">
+                          <Icon as={Star} size="xs" className="text-warning fill-warning" />
+                          <Text size="2xs" bold className="text-foreground">
+                            {job.companyRating}
+                          </Text>
+                          {Boolean(job.companyReviews) && (
+                            <Text size="2xs" className="text-muted-foreground">
+                              {job.companyReviews}
+                            </Text>
+                          )}
+                        </HStack>
+                      </Box>
+                    )}
                   </HStack>
 
                   <Text size="sm" className="text-muted-foreground leading-relaxed">
-                    {job.companyBio}
+                    {job.companyBio || `${job.company} recrute actuellement au Maroc.`}
                   </Text>
 
-                  <HStack className="bg-muted justify-between rounded-xl p-3">
-                    <VStack className="flex-1 items-center">
+                  <HStack className="bg-muted justify-between rounded-xl p-3" space="xs">
+                    <VStack className="min-w-0 flex-1 items-center">
                       <Text size="2xs" className="text-muted-foreground">
                         Effectif
                       </Text>
-                      <Text size="sm" bold className="text-foreground mt-0.5">
+                      <Text size="xs" bold numberOfLines={2} className="text-foreground mt-0.5 text-center">
                         {job.companyStats.size}
                       </Text>
                     </VStack>
-                    <VStack className="flex-1 items-center">
+                    <VStack className="min-w-0 flex-1 items-center">
                       <Text size="2xs" className="text-muted-foreground">
                         Phase
                       </Text>
-                      <Text size="sm" bold className="text-foreground mt-0.5">
+                      <Text size="xs" bold numberOfLines={2} className="text-foreground mt-0.5 text-center">
                         {job.companyStats.stage}
                       </Text>
                     </VStack>
-                    <VStack className="flex-1 items-center">
+                    <VStack className="min-w-0 flex-1 items-center">
                       <Text size="2xs" className="text-muted-foreground">
                         Siège
                       </Text>
-                      <Text size="sm" bold className="text-foreground mt-0.5 text-center">
+                      <Text size="xs" bold numberOfLines={2} className="text-foreground mt-0.5 text-center">
                         {job.companyStats.hq}
                       </Text>
                     </VStack>
@@ -458,6 +515,8 @@ export default function JobDetailScreen() {
         isSaved={saved}
         isApplied={applied}
         isApplying={isApplying}
+        sourceSite={offerSource?.sourceSite}
+        sourceUrl={offerSource?.sourceUrl}
         onToggleSave={handleToggleSave}
         onApply={handleOneClickApply}
       />
@@ -469,7 +528,11 @@ export default function JobDetailScreen() {
         isSubmitting={isApplying}
         onClose={() => setShowApplySheet(false)}
         onConfirm={handleConfirmApply}
-        onAttachCv={(cv) => updateProfile({ cvFile: cv })}
+        onAttachCv={(cv) => {
+          void uploadCv(cv).catch(() => {});
+        }}
+        sourceSite={offerSource?.sourceSite}
+        sourceUrl={offerSource?.sourceUrl}
       />
     </Box>
   );

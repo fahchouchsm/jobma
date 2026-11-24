@@ -11,7 +11,7 @@ export type OfferStatus = 'active' | 'paused' | 'closed';
 export interface OfferSalary {
   min: number;
   max: number;
-  currency: 'EUR' | 'USD' | 'MAD';
+  currency?: 'EUR' | 'USD' | 'MAD' | string;
   period: 'year' | 'month' | 'day';
 }
 
@@ -58,7 +58,7 @@ export interface Offer {
   contractType: OfferContractType;
   level: OfferLevel;
   location: string;
-  salary: OfferSalary;
+  salary?: OfferSalary;
   overview: string;
   skills: string[];
   responsibilities: OfferResponsibility[];
@@ -85,4 +85,50 @@ export interface OffersListResponse {
 
 export interface OfferDetailResponse {
   data: Offer;
+}
+
+export interface OfferSourceResponse {
+  offerId: string;
+  sourceSite: string;
+  sourceUrl: string;
+  mergedSources?: string[];
+}
+
+export interface OffersStatsResponse {
+  totalActive?: number;
+  byCategory?: Record<string, number>;
+  byWorkMode?: Record<string, number>;
+  byContractType?: Record<string, number>;
+  byLocation?: Record<string, number>;
+  bySource?: Record<string, number>;
+  lastScrapeRun?: {
+    startedAt: string;
+    finishedAt?: string;
+    status: string;
+    totalFetched?: number;
+    inserted?: number;
+    updated?: number;
+    duplicatesSkipped?: number;
+  };
+}
+
+export interface HealthResponse {
+  status: string;
+  activeOffers: number;
+  scraperRunning: boolean;
+  lastScrapeRun?: OffersStatsResponse['lastScrapeRun'];
+}
+
+export interface OffersQueryParams {
+  page?: number;
+  limit?: number;
+  category?: OfferCategory;
+  workMode?: OfferWorkMode;
+  contractType?: OfferContractType;
+  level?: OfferLevel;
+  status?: OfferStatus | 'all';
+  location?: string;
+  search?: string;
+  minSalary?: number;
+  sort?: 'newest' | 'salary_desc' | 'updated';
 }
