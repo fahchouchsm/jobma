@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bookmark, CheckCircle2, Trash2 } from 'lucide-react-native';
+import { Bookmark, CheckCircle2, EyeOff, Trash2 } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -18,6 +18,7 @@ interface JobCardProps {
   variant?: 'discover' | 'saved' | 'applied';
   onPress: () => void;
   onToggleSave?: () => void;
+  onHide?: () => void;
 }
 
 export function JobCard({
@@ -29,11 +30,18 @@ export function JobCard({
   variant = 'discover',
   onPress,
   onToggleSave,
+  onHide,
 }: JobCardProps) {
   const handleSavePress = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     triggerHaptic('light');
     onToggleSave?.();
+  };
+
+  const handleHidePress = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    triggerHaptic('light');
+    onHide?.();
   };
 
   const hasSalary = job.salaryRange && job.salaryRange !== 'Salaire non précisé';
@@ -53,26 +61,39 @@ export function JobCard({
             {job.title}
           </Text>
 
-          {onToggleSave && (
-            <ScalePressable
-              accessibilityLabel={
-                variant === 'saved' ? 'Retirer des favoris' : "Sauvegarder l'offre"
-              }
-              onPress={handleSavePress}
-              scaleTo={0.85}
-              className="-mt-1 -mr-1.5 h-8 w-8 shrink-0 items-center justify-center rounded-full">
-              <Icon
-                as={variant === 'saved' ? Trash2 : Bookmark}
-                size="sm"
-                className={
-                  variant === 'saved'
-                    ? 'text-destructive'
-                    : isSaved
-                      ? 'text-foreground fill-foreground'
-                      : 'text-muted-foreground'
-                }
-              />
-            </ScalePressable>
+          {(onToggleSave || onHide) && (
+            <HStack className="-mt-1 -mr-1.5 shrink-0 items-center">
+              {onHide && variant === 'discover' && (
+                <ScalePressable
+                  accessibilityLabel="Masquer cette offre"
+                  onPress={handleHidePress}
+                  scaleTo={0.85}
+                  className="h-8 w-8 items-center justify-center rounded-full">
+                  <Icon as={EyeOff} size="sm" className="text-muted-foreground" />
+                </ScalePressable>
+              )}
+              {onToggleSave && (
+                <ScalePressable
+                  accessibilityLabel={
+                    variant === 'saved' ? 'Retirer des favoris' : "Sauvegarder l'offre"
+                  }
+                  onPress={handleSavePress}
+                  scaleTo={0.85}
+                  className="h-8 w-8 items-center justify-center rounded-full">
+                  <Icon
+                    as={variant === 'saved' ? Trash2 : Bookmark}
+                    size="sm"
+                    className={
+                      variant === 'saved'
+                        ? 'text-destructive'
+                        : isSaved
+                          ? 'text-foreground fill-foreground'
+                          : 'text-muted-foreground'
+                    }
+                  />
+                </ScalePressable>
+              )}
+            </HStack>
           )}
         </HStack>
 

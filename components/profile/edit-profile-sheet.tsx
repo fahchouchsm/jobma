@@ -1,20 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, X } from 'lucide-react-native';
-import { AppBottomSheet } from '@/components/ui/app-bottom-sheet';
+import { useUniwind } from 'uniwind';
+import { AppBottomSheet, BottomSheetTextInput } from '@/components/ui/app-bottom-sheet';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
-import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import type { CandidateProfile } from '@/context/profile-context';
 import { triggerHaptic } from '@/lib/haptics';
+import { THEME } from '@/lib/theme';
 import { ApiValidationError } from '@/services/auth-service';
 
 const SALARY_PRESETS_MAD = [5, 8, 12, 18, 25];
+const ALL_CITIES_LABEL = 'Tout le Maroc';
+const MOROCCAN_CITIES = [
+  ALL_CITIES_LABEL,
+  'Casablanca',
+  'Rabat',
+  'Tanger',
+  'Marrakech',
+  'Agadir',
+  'Fès',
+];
 
 interface EditProfileSheetProps {
   visible: boolean;
@@ -24,6 +35,27 @@ interface EditProfileSheetProps {
 }
 
 export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProfileSheetProps) {
+  const { theme } = useUniwind();
+  const colors = THEME[theme === 'dark' ? 'dark' : 'light'];
+
+  const headlineRef = useRef<{ focus: () => void } | null>(null);
+  const phoneRef = useRef<{ focus: () => void } | null>(null);
+  const locationRef = useRef<{ focus: () => void } | null>(null);
+  const bioRef = useRef<{ focus: () => void } | null>(null);
+  const githubRef = useRef<{ focus: () => void } | null>(null);
+  const portfolioRef = useRef<{ focus: () => void } | null>(null);
+
+  const inputStyle = {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    color: colors.foreground,
+    fontSize: 14,
+  } as const;
+
   const [fullName, setFullName] = useState(profile.fullName);
   const [headline, setHeadline] = useState(profile.headline);
   const [phone, setPhone] = useState(profile.phone ?? '');
@@ -88,9 +120,15 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
 
   const toggleTargetCity = (city: string) => {
     triggerHaptic('light');
-    setTargetCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city]
-    );
+    setTargetCities((prev) => {
+      if (city === ALL_CITIES_LABEL) {
+        return prev.includes(ALL_CITIES_LABEL) ? [] : [ALL_CITIES_LABEL];
+      }
+      const withoutAll = prev.filter((c) => c !== ALL_CITIES_LABEL);
+      return withoutAll.includes(city)
+        ? withoutAll.filter((c) => c !== city)
+        : [...withoutAll, city];
+    });
   };
 
   const handleSave = async () => {
@@ -160,14 +198,21 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Nom complet
             </Text>
-            <Input className="bg-background border-border h-11 rounded-xl px-3">
-              <InputField
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Ex : Youssef Benali"
-                className="text-foreground text-sm"
-              />
-            </Input>
+            <BottomSheetTextInput
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="name"
+              textContentType="name"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => headlineRef.current?.focus()}
+              placeholder="Ex : Youssef Benali"
+              placeholderTextColor={colors.mutedForeground}
+              style={inputStyle}
+            />
             {fieldErrors.fullName && (
               <Text size="2xs" className="text-destructive">
                 {fieldErrors.fullName}
@@ -179,14 +224,19 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Titre du poste
             </Text>
-            <Input className="bg-background border-border h-11 rounded-xl px-3">
-              <InputField
-                value={headline}
-                onChangeText={setHeadline}
-                placeholder="Ex : Développeur Full Stack"
-                className="text-foreground text-sm"
-              />
-            </Input>
+            <BottomSheetTextInput
+              ref={headlineRef as never}
+              value={headline}
+              onChangeText={setHeadline}
+              autoCapitalize="sentences"
+              textContentType="jobTitle"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => phoneRef.current?.focus()}
+              placeholder="Ex : Développeur Full Stack"
+              placeholderTextColor={colors.mutedForeground}
+              style={inputStyle}
+            />
             {fieldErrors.headline && (
               <Text size="2xs" className="text-destructive">
                 {fieldErrors.headline}
@@ -198,15 +248,22 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Téléphone
             </Text>
-            <Input className="bg-background border-border h-11 rounded-xl px-3">
-              <InputField
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                placeholder="+212 6 12 34 56 78"
-                className="text-foreground text-sm"
-              />
-            </Input>
+            <BottomSheetTextInput
+              ref={phoneRef as never}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              inputMode="tel"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => locationRef.current?.focus()}
+              placeholder="+212 6 12 34 56 78"
+              placeholderTextColor={colors.mutedForeground}
+              style={inputStyle}
+            />
             {fieldErrors.phone && (
               <Text size="2xs" className="text-destructive">
                 {fieldErrors.phone}
@@ -218,14 +275,21 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Ville
             </Text>
-            <Input className="bg-background border-border h-11 rounded-xl px-3">
-              <InputField
-                value={location}
-                onChangeText={setLocation}
-                placeholder="Ex : Casablanca, Maroc"
-                className="text-foreground text-sm"
-              />
-            </Input>
+            <BottomSheetTextInput
+              ref={locationRef as never}
+              value={location}
+              onChangeText={setLocation}
+              autoCapitalize="words"
+              autoComplete="street-address"
+              textContentType="addressCity"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => bioRef.current?.focus()}
+              placeholder="Ex : Casablanca, Maroc"
+              placeholderTextColor={colors.mutedForeground}
+              style={inputStyle}
+            />
             {fieldErrors.location && (
               <Text size="2xs" className="text-destructive">
                 {fieldErrors.location}
@@ -237,17 +301,21 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Bio courte
             </Text>
-            <Input className="bg-background border-border h-20 items-start rounded-xl px-3 py-2">
-              <InputField
-                value={bio}
-                onChangeText={setBio}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                placeholder="Présentez votre parcours en quelques lignes..."
-                className="text-foreground h-full text-sm"
-              />
-            </Input>
+            <BottomSheetTextInput
+              ref={bioRef as never}
+              value={bio}
+              onChangeText={setBio}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              placeholder="Présentez votre parcours en quelques lignes..."
+              placeholderTextColor={colors.mutedForeground}
+              style={{
+                ...inputStyle,
+                height: 84,
+                paddingVertical: 10,
+              }}
+            />
           </VStack>
 
           <VStack space="xs">
@@ -255,33 +323,60 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
               Liens professionnels
             </Text>
             <VStack space="xs">
-              <Input className="bg-background border-border h-11 rounded-xl px-3">
-                <InputField
-                  value={linkedinUrl}
-                  onChangeText={setLinkedinUrl}
-                  autoCapitalize="none"
-                  placeholder="LinkedIn (https://linkedin.com/in/...)"
-                  className="text-foreground text-sm"
-                />
-              </Input>
-              <Input className="bg-background border-border h-11 rounded-xl px-3">
-                <InputField
-                  value={githubUrl}
-                  onChangeText={setGithubUrl}
-                  autoCapitalize="none"
-                  placeholder="GitHub (https://github.com/...)"
-                  className="text-foreground text-sm"
-                />
-              </Input>
-              <Input className="bg-background border-border h-11 rounded-xl px-3">
-                <InputField
-                  value={portfolioUrl}
-                  onChangeText={setPortfolioUrl}
-                  autoCapitalize="none"
-                  placeholder="Portfolio (https://...)"
-                  className="text-foreground text-sm"
-                />
-              </Input>
+              <BottomSheetTextInput
+                value={linkedinUrl}
+                onChangeText={setLinkedinUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="url"
+                inputMode="url"
+                autoComplete="url"
+                textContentType="URL"
+                importantForAutofill="yes"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => githubRef.current?.focus()}
+                placeholder="LinkedIn (https://linkedin.com/in/...)"
+                placeholderTextColor={colors.mutedForeground}
+                style={inputStyle}
+              />
+              <BottomSheetTextInput
+                ref={githubRef as never}
+                value={githubUrl}
+                onChangeText={setGithubUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="url"
+                inputMode="url"
+                autoComplete="url"
+                textContentType="URL"
+                importantForAutofill="yes"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => portfolioRef.current?.focus()}
+                placeholder="GitHub (https://github.com/...)"
+                placeholderTextColor={colors.mutedForeground}
+                style={inputStyle}
+              />
+              <BottomSheetTextInput
+                ref={portfolioRef as never}
+                value={portfolioUrl}
+                onChangeText={setPortfolioUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="url"
+                inputMode="url"
+                autoComplete="url"
+                textContentType="URL"
+                importantForAutofill="yes"
+                returnKeyType="done"
+                placeholder="Portfolio (https://...)"
+                placeholderTextColor={colors.mutedForeground}
+                style={inputStyle}
+              />
             </VStack>
           </VStack>
 
@@ -320,18 +415,23 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Compétences ({skills.length})
             </Text>
-            <Input className="bg-background border-border h-11 rounded-xl px-3">
-              <InputField
+            <HStack className="items-center" space="xs">
+              <BottomSheetTextInput
                 value={newSkill}
                 onChangeText={setNewSkill}
                 onSubmitEditing={handleAddSkill}
+                returnKeyType="done"
                 placeholder="Ajouter une compétence (ex : React)"
-                className="text-foreground text-sm"
+                placeholderTextColor={colors.mutedForeground}
+                style={{ ...inputStyle, flex: 1 }}
               />
-              <InputSlot onPress={handleAddSkill}>
-                <InputIcon as={Plus} className="text-primary" />
-              </InputSlot>
-            </Input>
+              <Pressable
+                accessibilityLabel="Ajouter une compétence"
+                onPress={handleAddSkill}
+                className="bg-primary-fixed h-11 w-11 items-center justify-center rounded-xl">
+                <Icon as={Plus} size="md" className="text-primary" />
+              </Pressable>
+            </HStack>
 
             <HStack className="flex-wrap gap-1.5 pt-1">
               {skills.map((skill) => (
@@ -352,18 +452,24 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
             <Text size="xs" bold className="text-foreground">
               Postes ciblés ({targetJobs.length})
             </Text>
-            <Input className="bg-background border-border h-11 rounded-xl px-3">
-              <InputField
+            <HStack className="items-center" space="xs">
+              <BottomSheetTextInput
                 value={newTargetJob}
                 onChangeText={setNewTargetJob}
                 onSubmitEditing={handleAddTargetJob}
+                autoCapitalize="sentences"
+                returnKeyType="done"
                 placeholder="Ex : Développeur Full Stack, Data Analyst"
-                className="text-foreground text-sm"
+                placeholderTextColor={colors.mutedForeground}
+                style={{ ...inputStyle, flex: 1 }}
               />
-              <InputSlot onPress={handleAddTargetJob}>
-                <InputIcon as={Plus} className="text-primary" />
-              </InputSlot>
-            </Input>
+              <Pressable
+                accessibilityLabel="Ajouter un poste ciblé"
+                onPress={handleAddTargetJob}
+                className="bg-primary-fixed h-11 w-11 items-center justify-center rounded-xl">
+                <Icon as={Plus} size="md" className="text-primary" />
+              </Pressable>
+            </HStack>
             <HStack className="flex-wrap gap-1.5 pt-1">
               {targetJobs.map((jobTitle) => (
                 <Pressable
@@ -386,7 +492,7 @@ export function EditProfileSheet({ visible, profile, onSave, onClose }: EditProf
               Villes ciblées
             </Text>
             <HStack className="flex-wrap gap-2">
-              {['Casablanca', 'Rabat', 'Tanger', 'Marrakech', 'Agadir', 'Fès'].map((city) => {
+              {MOROCCAN_CITIES.map((city) => {
                 const active = targetCities.includes(city);
                 return (
                   <Pressable

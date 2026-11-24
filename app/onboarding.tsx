@@ -14,10 +14,6 @@ import { ApiValidationError } from '@/services/auth-service';
 
 const TOTAL_STEPS = 5;
 
-function digitsCount(value?: string): number {
-  return (value ?? '').replace(/\D/g, '').length;
-}
-
 export default function OnboardingScreen() {
   const router = useRouter();
   const { profile, updateProfile, completeOnboarding } = useProfile();
@@ -26,28 +22,11 @@ export default function OnboardingScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const isStepInvalid = (() => {
-    if (step === 1) {
-      return (
-        profile.fullName.trim().length < 2 ||
-        profile.headline.trim().length < 2 ||
-        digitsCount(profile.phone) < 8 ||
-        profile.location.trim().length < 2 ||
-        (profile.targetJobs?.length ?? 0) < 1 ||
-        (profile.targetCities?.length ?? 0) < 1
-      );
-    }
-    if (step === 2) {
-      return profile.domains.length < 1 || profile.skills.length < 1;
-    }
-    if (step === 3) {
-      return profile.workModes.length < 1 || profile.contractTypes.length < 1;
-    }
-    return false;
-  })();
+  // Only selecting at least one domain (Step 1) is required after sign-in.
+  const isStepInvalid = step === 1 && profile.domains.length < 1;
 
   const handleFinish = async () => {
-    if (isSaving) return;
+    if (isSaving || profile.domains.length < 1) return;
     setIsSaving(true);
     setSubmitError(null);
     setFieldErrors({});
@@ -60,7 +39,7 @@ export default function OnboardingScreen() {
         setFieldErrors(err.fieldErrors);
         const identityFields = ['fullName', 'headline', 'phone', 'location', 'targetJobs', 'targetCities'];
         if (Object.keys(err.fieldErrors).some((k) => identityFields.includes(k))) {
-          setStep(1);
+          setStep(2);
         }
       } else {
         setSubmitError(
@@ -101,7 +80,8 @@ export default function OnboardingScreen() {
       nextDisabled={isStepInvalid || isSaving}
       isFinalStep={step === TOTAL_STEPS}
       onBack={handleBack}
-      onNext={handleNext}>
+      onNext={handleNext}
+      onSkip={step > 1 && step < TOTAL_STEPS ? () => void handleFinish() : undefined}>
       {submitError && (
         <Box className="bg-destructive/10 border-destructive/30 mb-4 rounded-xl border px-3.5 py-2.5">
           <Text size="xs" className="text-destructive">
@@ -110,14 +90,14 @@ export default function OnboardingScreen() {
         </Box>
       )}
       <Animated.View key={step} entering={FadeInRight.duration(260)}>
-        {step === 1 && (
+        {step === 1 && <StepDomain profile={profile} onChange={updateProfile} />}
+        {step === 2 && (
           <StepIdentity
             profile={profile}
             fieldErrors={fieldErrors}
             onChange={updateProfile}
           />
         )}
-        {step === 2 && <StepDomain profile={profile} onChange={updateProfile} />}
         {step === 3 && <StepPreferences profile={profile} onChange={updateProfile} />}
         {step === 4 && <StepCv profile={profile} onChange={updateProfile} />}
         {step === 5 && <StepSummary profile={profile} />}

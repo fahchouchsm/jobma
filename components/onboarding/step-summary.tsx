@@ -67,6 +67,7 @@ export function StepSummary({ profile }: { profile: CandidateProfile }) {
                   <Icon as={MapPin} size="xs" className="text-primary" />
                   <Text size="xs" className="text-muted-foreground">
                     {profile.location}
+                    {profile.phone ? ` • ${profile.phone}` : ''}
                   </Text>
                 </HStack>
               ) : null}
@@ -85,6 +86,9 @@ export function StepSummary({ profile }: { profile: CandidateProfile }) {
             </HStack>
             <Text size="xs" className="text-muted-foreground">
               {profile.domains.length > 0 ? profile.domains.join(' • ') : 'Tous domaines'}
+              {profile.targetJobs && profile.targetJobs.length > 0
+                ? ` — ${profile.targetJobs.slice(0, 3).join(', ')}`
+                : ''}
             </Text>
             {profile.skills.length > 0 && (
               <HStack className="flex-wrap gap-1.5 pt-1">

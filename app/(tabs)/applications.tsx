@@ -12,6 +12,7 @@ import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { Toast, ToastTitle, useToast } from '@/components/ui/toast';
 import { VStack } from '@/components/ui/vstack';
+import { JobCardSkeleton } from '@/components/discover/job-card-skeleton';
 import { EmptyState } from '@/components/empty-state';
 import { JobCard } from '@/components/job-card';
 import { JobmaHeader } from '@/components/jobma-header';
@@ -28,6 +29,7 @@ export default function ApplicationsScreen() {
     getOfferById,
     appliedIds,
     applications,
+    isSyncingCloud,
     isSaved,
     updateApplicationStatus,
     updateApplicationNote,
@@ -127,7 +129,12 @@ export default function ApplicationsScreen() {
             </ScrollView>
           )}
 
-          {appliedJobs.length === 0 ? (
+          {isSyncingCloud && appliedJobs.length === 0 ? (
+            <VStack space="md">
+              <JobCardSkeleton />
+              <JobCardSkeleton />
+            </VStack>
+          ) : appliedJobs.length === 0 ? (
             <EmptyState
               icon={Send}
               tone="secondary"

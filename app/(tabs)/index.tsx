@@ -80,6 +80,7 @@ export default function JobDiscoveryScreen() {
     offers,
     totalOffers,
     targetMatches,
+    hiddenIds,
     isLoadingOffers,
     isRefreshingOffers,
     isLoadingMoreOffers,
@@ -92,6 +93,8 @@ export default function JobDiscoveryScreen() {
     isSaved,
     isApplied,
     toggleSave,
+    hideOffer,
+    unhideOffer,
   } = useJobs();
   const {
     profile,
@@ -204,11 +207,12 @@ export default function JobDiscoveryScreen() {
   ]);
 
   const displayedJobs = useMemo(() => {
+    const visible = hiddenIds.length > 0 ? offers.filter((o) => !hiddenIds.includes(o.id)) : offers;
     if (sortMode === 'salary') {
-      return [...offers].sort((a, b) => b.minSalaryK - a.minSalaryK);
+      return [...visible].sort((a, b) => b.minSalaryK - a.minSalaryK);
     }
-    return offers;
-  }, [offers, sortMode]);
+    return visible;
+  }, [offers, hiddenIds, sortMode]);
 
   const showToast = useCallback(
     (message: string, undoAction?: { label: string; onPress: () => void }) => {
@@ -286,6 +290,20 @@ export default function JobDiscoveryScreen() {
     setMinSalaryFilter(0);
   };
 
+  const handleHideOffer = useCallback(
+    (job: JobListing) => {
+      hideOffer(job.id);
+      showToast('Offre masquée', {
+        label: 'Annuler',
+        onPress: () => {
+          triggerHaptic('light');
+          unhideOffer(job.id);
+        },
+      });
+    },
+    [hideOffer, unhideOffer, showToast]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: JobListing }) => {
       const serverMatch = targetMatches[item.id];
@@ -304,11 +322,22 @@ export default function JobDiscoveryScreen() {
               router.push(`/job/${item.id}`);
             }}
             onToggleSave={() => handleToggleBookmark(item)}
+            onHide={() => handleHideOffer(item)}
           />
         </Box>
       );
     },
-    [targetMatches, profile, isSaved, isApplied, query, addRecentSearch, router, handleToggleBookmark]
+    [
+      targetMatches,
+      profile,
+      isSaved,
+      isApplied,
+      query,
+      addRecentSearch,
+      router,
+      handleToggleBookmark,
+      handleHideOffer,
+    ]
   );
 
   const topPad = Platform.OS === 'web' ? 12 : Math.max(insets.top, 12);
@@ -500,6 +529,8 @@ export default function JobDiscoveryScreen() {
         renderItem={renderItem}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: headerHeight + 12, paddingBottom: 32 }}
         refreshControl={

@@ -61,12 +61,19 @@ export function JobmaHeader({
           </Pressable>
         )}
         <HStack className="min-w-0 flex-1 items-center px-1" space="xs">
-          <Text size="lg" bold className="text-primary tracking-tight">
-            Jobma
-          </Text>
-          <Text size="md" className="text-muted-foreground/50">
-            •
-          </Text>
+          {!showBack && (
+            <>
+              <Text size="lg" bold className="text-foreground tracking-tight">
+                jobma
+                <Text size="lg" bold className="text-primary">
+                  .
+                </Text>
+              </Text>
+              <Text size="md" className="text-muted-foreground/40">
+                /
+              </Text>
+            </>
+          )}
           <Heading size="sm" bold isTruncated className="text-foreground flex-1">
             {title}
           </Heading>

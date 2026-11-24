@@ -62,6 +62,7 @@ export interface JobApplication {
 
 interface PersistedJobsState {
   savedIds: string[];
+  hiddenIds?: string[];
   applications: Record<string, JobApplication>;
 }
 
@@ -71,6 +72,7 @@ interface JobsContextValue {
   targetMatches: Record<string, { score: number; reasons: string[] }>;
   lastScrapeAt: string | null;
   isLoadingOffers: boolean;
+  isSyncingCloud: boolean;
   isRefreshingOffers: boolean;
   isLoadingMoreOffers: boolean;
   hasMoreOffers: boolean;
@@ -82,9 +84,12 @@ interface JobsContextValue {
   getOfferById: (id: string) => JobListing | undefined;
   ensureOfferLoaded: (id: string) => Promise<JobListing | null>;
   savedIds: string[];
+  hiddenIds: string[];
   appliedIds: string[];
   applications: Record<string, JobApplication>;
   toggleSave: (id: string) => boolean;
+  hideOffer: (id: string) => void;
+  unhideOffer: (id: string) => void;
   markApplied: (id: string, details?: { cvName?: string; note?: string }) => void;
   updateApplicationStatus: (id: string, status: ApplicationStatus) => void;
   updateApplicationNote: (id: string, note?: string) => void;
@@ -109,6 +114,7 @@ function mergeUniqueOffers(existing: JobListing[], incoming: JobListing[]): JobL
 export function JobsProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [applications, setApplications] = useState<Record<string, JobApplication>>({});
 
   const [offers, setOffers] = useState<JobListing[]>([]);
@@ -120,6 +126,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreOffers, setHasMoreOffers] = useState(false);
   const [isLoadingOffers, setIsLoadingOffers] = useState(true);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [isRefreshingOffers, setIsRefreshingOffers] = useState(false);
   const [isLoadingMoreOffers, setIsLoadingMoreOffers] = useState(false);
   const [offersError, setOffersError] = useState<string | null>(null);
@@ -135,6 +142,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         if (!mounted || !raw) return;
         const parsed = JSON.parse(raw) as Partial<PersistedJobsState>;
         if (Array.isArray(parsed.savedIds)) setSavedIds(parsed.savedIds);
+        if (Array.isArray(parsed.hiddenIds)) setHiddenIds(parsed.hiddenIds);
         if (parsed.applications && typeof parsed.applications === 'object') {
           setApplications(parsed.applications);
         }
@@ -278,6 +286,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated) return;
     let mounted = true;
+    setIsSyncingCloud(true);
 
     Promise.all([fetchServerSavedOfferIds(), fetchServerApplications()])
       .then(async ([serverSavedIds, serverApps]) => {
@@ -313,7 +322,10 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setIsSyncingCloud(false);
+      });
 
     return () => {
       mounted = false;
@@ -392,13 +404,40 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     [offersById]
   );
 
-  const persist = useCallback((nextSaved: string[], nextApps: Record<string, JobApplication>) => {
-    const payload: PersistedJobsState = {
-      savedIds: nextSaved,
-      applications: nextApps,
-    };
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch(() => {});
-  }, []);
+  const persist = useCallback(
+    (nextSaved: string[], nextApps: Record<string, JobApplication>, nextHidden = hiddenIds) => {
+      const payload: PersistedJobsState = {
+        savedIds: nextSaved,
+        hiddenIds: nextHidden,
+        applications: nextApps,
+      };
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch(() => {});
+    },
+    [hiddenIds]
+  );
+
+  const hideOffer = useCallback(
+    (id: string) => {
+      setHiddenIds((prev) => {
+        if (prev.includes(id)) return prev;
+        const next = [...prev, id];
+        persist(savedIds, applications, next);
+        return next;
+      });
+    },
+    [savedIds, applications, persist]
+  );
+
+  const unhideOffer = useCallback(
+    (id: string) => {
+      setHiddenIds((prev) => {
+        const next = prev.filter((item) => item !== id);
+        persist(savedIds, applications, next);
+        return next;
+      });
+    },
+    [savedIds, applications, persist]
+  );
 
   const toggleSave = useCallback(
     (id: string): boolean => {
@@ -514,6 +553,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         targetMatches,
         lastScrapeAt,
         isLoadingOffers,
+        isSyncingCloud,
         isRefreshingOffers,
         isLoadingMoreOffers,
         hasMoreOffers,
@@ -525,9 +565,12 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         getOfferById,
         ensureOfferLoaded,
         savedIds,
+        hiddenIds,
         appliedIds,
         applications,
         toggleSave,
+        hideOffer,
+        unhideOffer,
         markApplied,
         updateApplicationStatus,
         updateApplicationNote,

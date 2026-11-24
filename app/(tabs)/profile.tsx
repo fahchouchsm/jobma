@@ -284,10 +284,10 @@ export default function ProfileScreen() {
                   </Pressable>
                   <VStack space="xs" className="min-w-0 flex-1">
                     <Heading size="lg" bold className="text-foreground">
-                      {profile.fullName}
+                      {profile.fullName || user?.fullName || 'Candidat Jobma'}
                     </Heading>
                     <Text size="sm" className="text-muted-foreground">
-                      {profile.headline} • {profile.experienceLevel}
+                      {profile.headline || 'Profil candidat'} • {profile.experienceLevel}
                     </Text>
                     <HStack className="items-center" space="xs">
                       <Icon as={MapPin} size="xs" className="text-primary shrink-0" />

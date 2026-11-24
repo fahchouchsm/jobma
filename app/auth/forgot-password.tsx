@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle2, KeyRound, Lock, Mail } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -24,9 +24,12 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  const newPasswordRef = useRef<{ focus: () => void } | null>(null);
 
   const handleRequestCode = async () => {
     setError(null);
@@ -77,6 +80,7 @@ export default function ForgotPasswordScreen() {
         <ScrollView
           className="flex-1"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{
             paddingTop: Platform.OS === 'web' ? 24 : Math.max(insets.top + 12, 24),
             paddingBottom: Math.max(insets.bottom + 24, 32),
@@ -136,7 +140,14 @@ export default function ForgotPasswordScreen() {
                       value={email}
                       onChangeText={setEmail}
                       autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
                       keyboardType="email-address"
+                      inputMode="email"
+                      autoComplete="email"
+                      textContentType="emailAddress"
+                      importantForAutofill="yes"
+                      returnKeyType="send"
                       placeholder="vous@exemple.com"
                       onSubmitEditing={() => void handleRequestCode()}
                       className="text-foreground text-sm"
@@ -175,6 +186,13 @@ export default function ForgotPasswordScreen() {
                       value={code}
                       onChangeText={setCode}
                       keyboardType="number-pad"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      textContentType="oneTimeCode"
+                      importantForAutofill="yes"
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => newPasswordRef.current?.focus()}
                       maxLength={8}
                       placeholder="123456"
                       className="text-foreground text-sm"
@@ -191,13 +209,26 @@ export default function ForgotPasswordScreen() {
                       <InputIcon as={Lock} className="text-muted-foreground" />
                     </InputSlot>
                     <InputField
+                      ref={newPasswordRef as never}
                       value={newPassword}
                       onChangeText={setNewPassword}
-                      secureTextEntry
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="new-password"
+                      textContentType="newPassword"
+                      importantForAutofill="yes"
+                      returnKeyType="done"
                       placeholder="Minimum 6 caractères"
                       onSubmitEditing={() => void handleConfirmReset()}
                       className="text-foreground text-sm"
                     />
+                    <InputSlot onPress={() => setShowPassword((prev) => !prev)} className="pl-2">
+                      <InputIcon
+                        as={showPassword ? EyeOff : Eye}
+                        className="text-muted-foreground"
+                      />
+                    </InputSlot>
                   </Input>
                 </VStack>
 

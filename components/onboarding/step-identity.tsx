@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Briefcase, MapPin, Phone, Plus, User, X } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
@@ -11,7 +11,16 @@ import { VStack } from '@/components/ui/vstack';
 import type { CandidateProfile } from '@/context/profile-context';
 import { triggerHaptic } from '@/lib/haptics';
 
-const MOROCCAN_CITIES = ['Casablanca', 'Rabat', 'Tanger', 'Marrakech', 'Agadir', 'Fès'];
+const ALL_CITIES_LABEL = 'Tout le Maroc';
+const MOROCCAN_CITIES = [
+  ALL_CITIES_LABEL,
+  'Casablanca',
+  'Rabat',
+  'Tanger',
+  'Marrakech',
+  'Agadir',
+  'Fès',
+];
 const SUGGESTED_JOBS = [
   'Développeur Full Stack',
   'Développeur Mobile',
@@ -29,6 +38,9 @@ interface StepIdentityProps {
 
 export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdentityProps) {
   const [customTargetJob, setCustomTargetJob] = useState('');
+  const headlineRef = useRef<{ focus: () => void } | null>(null);
+  const phoneRef = useRef<{ focus: () => void } | null>(null);
+  const locationRef = useRef<{ focus: () => void } | null>(null);
 
   const targetJobs = profile.targetJobs ?? [];
   const targetCities = profile.targetCities ?? [];
@@ -51,8 +63,14 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
 
   const toggleTargetCity = (city: string) => {
     triggerHaptic('light');
-    const exists = targetCities.includes(city);
-    const next = exists ? targetCities.filter((c) => c !== city) : [...targetCities, city];
+    if (city === ALL_CITIES_LABEL) {
+      const next = targetCities.includes(ALL_CITIES_LABEL) ? [] : [ALL_CITIES_LABEL];
+      onChange({ targetCities: next });
+      return;
+    }
+    const withoutAll = targetCities.filter((c) => c !== ALL_CITIES_LABEL);
+    const exists = withoutAll.includes(city);
+    const next = exists ? withoutAll.filter((c) => c !== city) : [...withoutAll, city];
     onChange({
       targetCities: next,
       location: profile.location.trim() ? profile.location : next[0] ? `${next[0]}, Maroc` : '',
@@ -66,14 +84,14 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
           Complétez votre profil
         </Heading>
         <Text size="sm" className="text-muted-foreground">
-          Ces informations permettent aux recruteurs de vous contacter et de personnaliser vos offres.
+          Optionnel — vous pouvez passer cette étape et la compléter plus tard depuis votre profil.
         </Text>
       </VStack>
 
       <VStack space="md">
         <VStack space="xs">
           <Text size="xs" bold className="text-foreground">
-            Nom complet *
+            Nom complet
           </Text>
           <Input className="bg-card border-border h-11 rounded-xl px-3">
             <InputSlot className="pr-2">
@@ -82,6 +100,14 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
             <InputField
               value={profile.fullName}
               onChangeText={(text) => onChange({ fullName: text })}
+              autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="name"
+              textContentType="name"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => headlineRef.current?.focus()}
               placeholder="Ex : Youssef Benali"
               className="text-foreground text-sm"
             />
@@ -95,15 +121,21 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
 
         <VStack space="xs">
           <Text size="xs" bold className="text-foreground">
-            Titre du poste actuel ou visé *
+            Titre du poste actuel ou visé
           </Text>
           <Input className="bg-card border-border h-11 rounded-xl px-3">
             <InputSlot className="pr-2">
               <InputIcon as={Briefcase} className="text-muted-foreground" />
             </InputSlot>
             <InputField
+              ref={headlineRef as never}
               value={profile.headline}
               onChangeText={(text) => onChange({ headline: text })}
+              autoCapitalize="sentences"
+              textContentType="jobTitle"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => phoneRef.current?.focus()}
               placeholder="Ex : Développeur Full Stack React / Spring"
               className="text-foreground text-sm"
             />
@@ -117,16 +149,24 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
 
         <VStack space="xs">
           <Text size="xs" bold className="text-foreground">
-            Téléphone *
+            Téléphone
           </Text>
           <Input className="bg-card border-border h-11 rounded-xl px-3">
             <InputSlot className="pr-2">
               <InputIcon as={Phone} className="text-muted-foreground" />
             </InputSlot>
             <InputField
+              ref={phoneRef as never}
               value={profile.phone ?? ''}
               onChangeText={(text) => onChange({ phone: text })}
               keyboardType="phone-pad"
+              inputMode="tel"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => locationRef.current?.focus()}
               placeholder="+212 6 12 34 56 78"
               className="text-foreground text-sm"
             />
@@ -140,15 +180,20 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
 
         <VStack space="xs">
           <Text size="xs" bold className="text-foreground">
-            Ville actuelle *
+            Ville actuelle
           </Text>
           <Input className="bg-card border-border h-11 rounded-xl px-3">
             <InputSlot className="pr-2">
               <InputIcon as={MapPin} className="text-muted-foreground" />
             </InputSlot>
             <InputField
+              ref={locationRef as never}
               value={profile.location}
               onChangeText={(text) => onChange({ location: text })}
+              autoCapitalize="words"
+              autoComplete="street-address"
+              textContentType="addressCity"
+              returnKeyType="done"
               placeholder="Ex : Casablanca, Maroc"
               className="text-foreground text-sm"
             />
@@ -163,13 +208,15 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
         {/* Target Jobs */}
         <VStack space="xs">
           <Text size="xs" bold className="text-foreground">
-            Postes recherchés * ({targetJobs.length})
+            Postes recherchés ({targetJobs.length})
           </Text>
           <Input className="bg-card border-border h-11 rounded-xl px-3">
             <InputField
               value={customTargetJob}
               onChangeText={setCustomTargetJob}
               onSubmitEditing={addCustomJob}
+              autoCapitalize="sentences"
+              returnKeyType="done"
               placeholder="Ajouter un poste ciblé..."
               className="text-foreground text-sm"
             />
@@ -208,7 +255,7 @@ export function StepIdentity({ profile, fieldErrors = {}, onChange }: StepIdenti
         {/* Target Cities */}
         <VStack space="xs">
           <Text size="xs" bold className="text-foreground">
-            Villes ciblées au Maroc * ({targetCities.length})
+            Villes ciblées au Maroc ({targetCities.length})
           </Text>
           <HStack className="flex-wrap gap-2">
             {MOROCCAN_CITIES.map((city) => {

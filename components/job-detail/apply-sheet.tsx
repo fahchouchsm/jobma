@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
 import { Linking } from 'react-native';
-import { ExternalLink, FileText, Send, UploadCloud, X, Zap } from 'lucide-react-native';
-import { AppBottomSheet } from '@/components/ui/app-bottom-sheet';
+import { ExternalLink, FileText, Send, Sparkles, UploadCloud, X, Zap } from 'lucide-react-native';
+import { AppBottomSheet, BottomSheetTextInput } from '@/components/ui/app-bottom-sheet';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
-import { Input, InputField } from '@/components/ui/input';
 import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { useUniwind } from 'uniwind';
 import type { CandidateProfile, CvAttachment } from '@/context/profile-context';
 import type { JobListing } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
+import { THEME } from '@/lib/theme';
 
 const MAX_NOTE_LENGTH = 300;
 
@@ -43,9 +44,25 @@ export function ApplySheet({
   sourceSite,
   sourceUrl,
 }: ApplySheetProps) {
+  const { theme } = useUniwind();
+  const colors = THEME[theme === 'dark' ? 'dark' : 'light'];
   const [note, setNote] = useState('');
   const [isPickingCv, setIsPickingCv] = useState(false);
   const [selectedCvId, setSelectedCvId] = useState<string | undefined>(profile.cvFile?.id);
+
+  const handleGeneratePitch = () => {
+    triggerHaptic('light');
+    const jobSkills = (job.skills ?? []).map((s) => s.toLowerCase());
+    const matched = profile.skills.filter((s) => jobSkills.includes(s.toLowerCase())).slice(0, 3);
+    const skillText =
+      matched.length > 0
+        ? `Ma maîtrise de ${matched.join(', ')}`
+        : profile.skills.length > 0
+          ? `Mon expérience en ${profile.skills.slice(0, 2).join(' et ')}`
+          : `Mon parcours (${profile.experienceLevel})`;
+    const draft = `Bonjour, très intéressé(e) par le poste de ${job.title} chez ${job.company}. ${skillText} correspond à vos besoins. Disponible ${profile.availability.toLowerCase()} pour en discuter !`;
+    setNote(draft.slice(0, MAX_NOTE_LENGTH));
+  };
 
   const availableCvs = cvFiles.length > 0 ? cvFiles : profile.cvFile ? [profile.cvFile] : [];
   const activeCv =
@@ -191,26 +208,45 @@ export function ApplySheet({
 
             {/* Optional Note */}
             <VStack space="xs">
-              <HStack className="items-center justify-between">
+              <HStack className="items-center justify-between" space="sm">
                 <Text size="xs" bold className="text-foreground">
-                  Mot pour le recruteur (optionnel)
+                  Mot pour le recruteur
                 </Text>
-                <Text size="2xs" className="text-muted-foreground">
-                  {note.length}/{MAX_NOTE_LENGTH}
-                </Text>
+                <HStack className="items-center" space="sm">
+                  <Pressable
+                    onPress={handleGeneratePitch}
+                    className="bg-primary-fixed flex-row items-center gap-1 rounded-full px-2.5 py-0.5">
+                    <Icon as={Sparkles} size="2xs" className="text-primary" />
+                    <Text size="2xs" bold className="text-primary">
+                      Générer
+                    </Text>
+                  </Pressable>
+                  <Text size="2xs" className="text-muted-foreground">
+                    {note.length}/{MAX_NOTE_LENGTH}
+                  </Text>
+                </HStack>
               </HStack>
-              <Input className="bg-background border-border h-24 items-start rounded-xl px-3 py-2">
-                <InputField
-                  value={note}
-                  onChangeText={setNote}
-                  multiline
-                  numberOfLines={3}
-                  maxLength={MAX_NOTE_LENGTH}
-                  textAlignVertical="top"
-                  placeholder={`Ex : Très intéressé(e) par le poste chez ${job.company}...`}
-                  className="text-foreground h-full text-sm"
-                />
-              </Input>
+              <BottomSheetTextInput
+                value={note}
+                onChangeText={setNote}
+                multiline
+                numberOfLines={3}
+                maxLength={MAX_NOTE_LENGTH}
+                textAlignVertical="top"
+                placeholder={`Ex : Très intéressé(e) par le poste chez ${job.company}...`}
+                placeholderTextColor={colors.mutedForeground}
+                style={{
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  height: 96,
+                  color: colors.foreground,
+                  fontSize: 14,
+                }}
+              />
             </VStack>
 
             {/* Actions */}

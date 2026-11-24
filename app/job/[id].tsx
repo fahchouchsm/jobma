@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Share } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, Share } from 'react-native';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Award,
+  Briefcase,
   Building2,
   Check,
   CheckCircle2,
+  Compass,
   Eye,
   GitBranch,
   GraduationCap,
@@ -35,11 +37,12 @@ import { JobApplyBar } from '@/components/job-detail/job-apply-bar';
 import { JobHeroCard } from '@/components/job-detail/job-hero-card';
 import { JobMetricsRow } from '@/components/job-detail/job-metrics-row';
 import { type JobDetailTabId, JobSegmentedTabs } from '@/components/job-detail/job-segmented-tabs';
+import { EmptyState } from '@/components/empty-state';
 import { JobmaHeader } from '@/components/jobma-header';
 import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
 import { type CvAttachment, useProfile } from '@/context/profile-context';
-import { JOBS, type JobBenefit, type JobListing, type JobQualification } from '@/data/jobs';
+import type { JobBenefit, JobListing, JobQualification } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 import { computeJobMatch } from '@/lib/job-match';
 import { fetchOfferSource, fetchSimilarOffers, submitApplication } from '@/services/jobs-service';
@@ -68,21 +71,45 @@ export default function JobDetailScreen() {
     useJobs();
   const { profile, cvFiles, uploadCv } = useProfile();
 
-  const job = getOfferById(id) ?? offers[0] ?? JOBS[0];
-  const match = computeJobMatch(job, profile);
+  const cachedJob = id ? getOfferById(id) : undefined;
+  const [loadedJob, setLoadedJob] = useState<JobListing | null>(cachedJob ?? null);
+  const [isLoadingJob, setIsLoadingJob] = useState(!cachedJob);
+  const job = cachedJob ?? loadedJob;
+
   const [serverSimilarJobs, setServerSimilarJobs] = useState<JobListing[]>([]);
-  const similarJobs =
-    serverSimilarJobs.length > 0
+  const similarJobs = job
+    ? serverSimilarJobs.length > 0
       ? serverSimilarJobs.slice(0, 3)
-      : offers.filter((item) => item.id !== job.id && item.category === job.category).slice(0, 3);
+      : offers.filter((item) => item.id !== job.id && item.category === job.category).slice(0, 3)
+    : [];
 
   useEffect(() => {
-    if (id && !getOfferById(id)) {
-      void ensureOfferLoaded(id);
+    let mounted = true;
+    if (!id) {
+      setIsLoadingJob(false);
+      return;
     }
-  }, [id, getOfferById, ensureOfferLoaded]);
-  const saved = isSaved(job.id);
-  const applied = isApplied(job.id);
+    if (cachedJob) {
+      setLoadedJob(cachedJob);
+      setIsLoadingJob(false);
+      return;
+    }
+    setIsLoadingJob(true);
+    ensureOfferLoaded(id)
+      .then((fetched) => {
+        if (mounted) setLoadedJob(fetched);
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingJob(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [id, cachedJob, ensureOfferLoaded]);
+
+  const saved = job ? isSaved(job.id) : false;
+  const applied = job ? isApplied(job.id) : false;
+  const match = job ? computeJobMatch(job, profile) : { score: 0, reasons: [] };
 
   const [activeTab, setActiveTab] = useState<JobDetailTabId>('overview');
   const [isApplying, setIsApplying] = useState(false);
@@ -91,7 +118,7 @@ export default function JobDetailScreen() {
 
   useEffect(() => {
     let mounted = true;
-    if (!job.id) return;
+    if (!job?.id) return;
     fetchOfferSource(job.id)
       .then((src) => {
         if (mounted) setOfferSource(src);
@@ -105,7 +132,7 @@ export default function JobDetailScreen() {
     return () => {
       mounted = false;
     };
-  }, [job.id]);
+  }, [job?.id]);
 
   const showToast = (message: string) => {
     toast.show({
@@ -131,12 +158,14 @@ export default function JobDetailScreen() {
   };
 
   const handleToggleSave = () => {
+    if (!job) return;
     triggerHaptic('light');
     const nextSaved = toggleSave(job.id);
     showToast(nextSaved ? 'Enregistré dans vos offres favorites' : 'Retiré de vos favoris');
   };
 
   const handleShare = async () => {
+    if (!job) return;
     try {
       await Share.share({
         title: `${job.title} chez ${job.company}`,
@@ -148,13 +177,13 @@ export default function JobDetailScreen() {
   };
 
   const handleOneClickApply = () => {
-    if (applied || isApplying) return;
+    if (!job || applied || isApplying) return;
     triggerHaptic('light');
     setShowApplySheet(true);
   };
 
   const handleConfirmApply = async (note: string, selectedCv?: CvAttachment | null) => {
-    if (applied || isApplying) return;
+    if (!job || applied || isApplying) return;
     const chosenCv = selectedCv ?? profile.cvFile;
     triggerHaptic('medium');
     setIsApplying(true);
@@ -186,6 +215,44 @@ export default function JobDetailScreen() {
     }
   };
 
+  if (isLoadingJob) {
+    return (
+      <Box className="bg-background flex-1">
+        <JobmaHeader title="Détails de l'offre" showBack onBack={handleBack} />
+        <Box className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" />
+          <Text size="xs" className="text-muted-foreground mt-2">
+            Chargement de l&apos;offre...
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!job) {
+    return (
+      <Box className="bg-background flex-1">
+        <JobmaHeader title="Détails de l'offre" showBack onBack={handleBack} />
+        <Box className="flex-1 justify-center px-4">
+          <EmptyState
+            icon={Briefcase}
+            tone="muted"
+            title="Offre introuvable"
+            description="Cette offre a peut-être expiré ou n'est plus disponible."
+            actionLabel="Retour aux offres"
+            actionIcon={Compass}
+            onAction={handleBack}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  const profileSkillSet = new Set(profile.skills.map((s) => s.toLowerCase()));
+  const jobSkills = job.skills ?? [];
+  const matchedSkills = jobSkills.filter((s) => profileSkillSet.has(s.toLowerCase()));
+  const missingSkills = jobSkills.filter((s) => !profileSkillSet.has(s.toLowerCase()));
+
   return (
     <Box className="bg-background flex-1">
       <JobmaHeader
@@ -210,6 +277,9 @@ export default function JobDetailScreen() {
           job={job}
           sourceSite={offerSource?.sourceSite}
           sourceUrl={offerSource?.sourceUrl}
+          onCompanyPress={() =>
+            router.push(`/company/${encodeURIComponent(job.company)}` as Href)
+          }
         />
 
         {/* Match Score Banner */}
@@ -304,45 +374,107 @@ export default function JobDetailScreen() {
             )}
 
             {activeTab === 'requirements' && (
-              <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
-                <VStack space="sm">
-                  <HStack className="items-center" space="sm">
-                    <Box className="bg-accent h-7 w-7 items-center justify-center rounded-lg">
-                      <Icon as={GraduationCap} size="sm" className="text-primary" />
-                    </Box>
-                    <Heading size="sm" bold className="text-foreground">
-                      Qualifications & Compétences requises
-                    </Heading>
-                  </HStack>
+              <VStack space="md">
+                {jobSkills.length > 0 && (
+                  <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+                    <VStack space="sm">
+                      <HStack className="items-center justify-between">
+                        <Heading size="sm" bold className="text-foreground">
+                          Analyse de vos compétences
+                        </Heading>
+                        <Text size="xs" bold className="text-secondary">
+                          {matchedSkills.length}/{jobSkills.length} acquises
+                        </Text>
+                      </HStack>
 
-                  <VStack space="sm" className="pt-1">
-                    {job.qualifications.length === 0 ? (
-                      <Text size="xs" className="text-muted-foreground">
-                        Consultez l&apos;aperçu du poste pour les qualifications détaillées.
-                      </Text>
-                    ) : (
-                      job.qualifications.map((qual) => {
-                        const QualIcon = QUALIFICATION_ICON_MAP[qual.icon];
-                        return (
-                          <Box key={qual.id} className="bg-muted rounded-xl p-3">
-                            <VStack space="xs">
-                              <HStack className="items-start" space="xs">
-                                <Icon as={QualIcon} size="sm" className="text-primary mt-0.5 shrink-0" />
-                                <Text size="xs" bold className="text-foreground flex-1 leading-snug">
-                                  {qual.title}
+                      {matchedSkills.length > 0 && (
+                        <VStack space="xs">
+                          <Text size="2xs" bold className="text-secondary uppercase">
+                            Correspondances
+                          </Text>
+                          <HStack className="flex-wrap gap-1.5">
+                            {matchedSkills.map((skill) => (
+                              <HStack
+                                key={skill}
+                                className="bg-secondary-container items-center rounded-full px-2.5 py-1"
+                                space="xs">
+                                <Icon as={Check} size="2xs" className="text-secondary" />
+                                <Text size="xs" bold className="text-on-secondary-container">
+                                  {skill}
                                 </Text>
                               </HStack>
-                              <Text size="xs" className="text-muted-foreground leading-relaxed">
-                                {qual.description}
-                              </Text>
-                            </VStack>
-                          </Box>
-                        );
-                      })
-                    )}
+                            ))}
+                          </HStack>
+                        </VStack>
+                      )}
+
+                      {missingSkills.length > 0 && (
+                        <VStack space="xs">
+                          <Text size="2xs" bold className="text-muted-foreground uppercase">
+                            À renforcer / non listées sur votre profil
+                          </Text>
+                          <HStack className="flex-wrap gap-1.5">
+                            {missingSkills.map((skill) => (
+                              <Box key={skill} className="bg-muted rounded-full px-2.5 py-1">
+                                <Text size="xs" className="text-muted-foreground">
+                                  {skill}
+                                </Text>
+                              </Box>
+                            ))}
+                          </HStack>
+                        </VStack>
+                      )}
+                    </VStack>
+                  </Card>
+                )}
+
+                <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+                  <VStack space="sm">
+                    <HStack className="items-center" space="sm">
+                      <Box className="bg-accent h-7 w-7 items-center justify-center rounded-lg">
+                        <Icon as={GraduationCap} size="sm" className="text-primary" />
+                      </Box>
+                      <Heading size="sm" bold className="text-foreground">
+                        Qualifications & Compétences requises
+                      </Heading>
+                    </HStack>
+
+                    <VStack space="sm" className="pt-1">
+                      {job.qualifications.length === 0 ? (
+                        <Text size="xs" className="text-muted-foreground">
+                          Consultez l&apos;aperçu du poste pour les qualifications détaillées.
+                        </Text>
+                      ) : (
+                        job.qualifications.map((qual) => {
+                          const QualIcon = QUALIFICATION_ICON_MAP[qual.icon];
+                          return (
+                            <Box key={qual.id} className="bg-muted rounded-xl p-3">
+                              <VStack space="xs">
+                                <HStack className="items-start" space="xs">
+                                  <Icon
+                                    as={QualIcon}
+                                    size="sm"
+                                    className="text-primary mt-0.5 shrink-0"
+                                  />
+                                  <Text
+                                    size="xs"
+                                    bold
+                                    className="text-foreground flex-1 leading-snug">
+                                    {qual.title}
+                                  </Text>
+                                </HStack>
+                                <Text size="xs" className="text-muted-foreground leading-relaxed">
+                                  {qual.description}
+                                </Text>
+                              </VStack>
+                            </Box>
+                          );
+                        })
+                      )}
+                    </VStack>
                   </VStack>
-                </VStack>
-              </Card>
+                </Card>
+              </VStack>
             )}
 
             {activeTab === 'benefits' && (

@@ -17,9 +17,10 @@ interface JobHeroCardProps {
   job: JobListing;
   sourceSite?: string;
   sourceUrl?: string;
+  onCompanyPress?: () => void;
 }
 
-export function JobHeroCard({ job, sourceSite, sourceUrl }: JobHeroCardProps) {
+export function JobHeroCard({ job, sourceSite, sourceUrl, onCompanyPress }: JobHeroCardProps) {
   return (
     <Box className="mb-3 px-4">
       <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
@@ -50,9 +51,14 @@ export function JobHeroCard({ job, sourceSite, sourceUrl }: JobHeroCardProps) {
               </Heading>
 
               <HStack className="flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                <Text size="xs" bold className="text-foreground">
-                  {job.company}
-                </Text>
+                <Pressable disabled={!onCompanyPress} onPress={onCompanyPress}>
+                  <Text
+                    size="xs"
+                    bold
+                    className={onCompanyPress ? 'text-primary underline' : 'text-foreground'}>
+                    {job.company}
+                  </Text>
+                </Pressable>
                 <Box className="bg-border h-1 w-1 rounded-full" />
                 <Text size="xs" className="text-muted-foreground">
                   {job.industry}

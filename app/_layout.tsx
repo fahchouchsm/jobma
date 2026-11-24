@@ -47,7 +47,7 @@ function AppAccessGate() {
       return;
     }
 
-    const needsOnboarding = !hasCompletedOnboarding || !isProfileComplete;
+    const needsOnboarding = !hasCompletedOnboarding;
     if (needsOnboarding) {
       if (!inOnboarding) {
         router.replace('/onboarding');
@@ -143,6 +143,7 @@ export default function RootLayout() {
                       <Stack.Screen name="auth/register" />
                       <Stack.Screen name="auth/forgot-password" />
                       <Stack.Screen name="job/[id]" />
+                      <Stack.Screen name="company/[name]" />
                     </Stack>
                     <PortalHost />
                   </ThemeProvider>

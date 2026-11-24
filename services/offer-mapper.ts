@@ -127,6 +127,7 @@ export function mapOfferToJobListing(offer: Offer): JobListing {
       { id: 'level', label: level, icon: 'level', tone: 'indigo' },
     ],
     overview: offer.overview,
+    skills: offer.skills ?? [],
     highlightTitle: `${offer.company?.name ?? 'Entreprise'} • ${workMode}`,
     highlightSubtitle: (offer.skills ?? []).slice(0, 3).join(' • ') || offer.category,
     responsibilities: offer.responsibilities ?? [],

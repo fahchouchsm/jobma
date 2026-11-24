@@ -90,6 +90,7 @@ export function AppBottomSheet({
         <BottomSheetScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 8,

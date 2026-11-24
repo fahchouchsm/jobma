@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Check, ExternalLink, FileText, Trash2, X } from 'lucide-react-native';
-import { AppBottomSheet } from '@/components/ui/app-bottom-sheet';
+import { BellRing, Calendar, Check, ExternalLink, FileText, Trash2, X } from 'lucide-react-native';
+import { AppBottomSheet, BottomSheetTextInput } from '@/components/ui/app-bottom-sheet';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
-import { Input, InputField } from '@/components/ui/input';
 import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { useUniwind } from 'uniwind';
 import type { ApplicationStatus, JobApplication } from '@/context/jobs-context';
 import type { JobListing } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
+import { THEME } from '@/lib/theme';
+import { scheduleInterviewReminder } from '@/services/notifications-service';
 
 const STATUS_STAGES: ApplicationStatus[] = ['Envoyée', 'En cours', 'Entretien', 'Offre'];
 const MAX_NOTE_LENGTH = 300;
@@ -50,11 +52,29 @@ export function ApplicationDetailSheet({
   onWithdraw,
   onViewJob,
 }: ApplicationDetailSheetProps) {
+  const { theme } = useUniwind();
+  const colors = THEME[theme === 'dark' ? 'dark' : 'light'];
   const [note, setNote] = useState('');
+  const [reminderSaved, setReminderSaved] = useState<string | null>(null);
 
   useEffect(() => {
     setNote(application?.note ?? '');
+    setReminderSaved(null);
   }, [application?.jobId, application?.note, visible]);
+
+  const handleScheduleReminder = async (label: string, offsetHours: number) => {
+    if (!job) return;
+    triggerHaptic('light');
+    const target = new Date(Date.now() + offsetHours * 60 * 60 * 1000);
+    const id = await scheduleInterviewReminder({
+      offerId: job.id,
+      jobTitle: job.title,
+      company: job.company,
+      triggerDate: target,
+    });
+    setReminderSaved(id ? `Rappel programmé (${label})` : `Rappel local prêt (${label})`);
+    triggerHaptic('success');
+  };
 
   const trimmedNote = note.trim();
   const hasNoteChanged = Boolean(application) && trimmedNote !== (application?.note ?? '');
@@ -143,6 +163,37 @@ export function ApplicationDetailSheet({
               </HStack>
             </VStack>
 
+            {/* Interview Reminder */}
+            <VStack space="xs">
+              <HStack className="items-center" space="xs">
+                <Icon as={BellRing} size="xs" className="text-primary" />
+                <Text size="xs" bold className="text-foreground">
+                  Rappel d&apos;entretien
+                </Text>
+              </HStack>
+              <HStack className="flex-wrap gap-2">
+                {[
+                  { label: 'Dans 1h', hours: 1 },
+                  { label: 'Demain', hours: 24 },
+                  { label: 'Dans 2 jours', hours: 48 },
+                ].map((preset) => (
+                  <Pressable
+                    key={preset.label}
+                    onPress={() => void handleScheduleReminder(preset.label, preset.hours)}
+                    className="bg-muted rounded-full px-3 py-1.5 active:opacity-80">
+                    <Text size="2xs" bold className="text-foreground">
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </HStack>
+              {reminderSaved && (
+                <Text size="2xs" bold className="text-secondary">
+                  ✓ {reminderSaved}
+                </Text>
+              )}
+            </VStack>
+
             {/* Recruiter note */}
             <VStack space="xs">
               <HStack className="items-center justify-between">
@@ -153,18 +204,27 @@ export function ApplicationDetailSheet({
                   {note.length}/{MAX_NOTE_LENGTH}
                 </Text>
               </HStack>
-              <Input className="bg-background border-border h-24 items-start rounded-xl px-3 py-2">
-                <InputField
-                  value={note}
-                  onChangeText={setNote}
-                  multiline
-                  numberOfLines={3}
-                  maxLength={MAX_NOTE_LENGTH}
-                  textAlignVertical="top"
-                  placeholder="Ajoutez un mémo d'entretien ou modifiez votre note..."
-                  className="text-foreground h-full text-sm"
-                />
-              </Input>
+              <BottomSheetTextInput
+                value={note}
+                onChangeText={setNote}
+                multiline
+                numberOfLines={3}
+                maxLength={MAX_NOTE_LENGTH}
+                textAlignVertical="top"
+                placeholder="Ajoutez un mémo d'entretien ou modifiez votre note..."
+                placeholderTextColor={colors.mutedForeground}
+                style={{
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  height: 96,
+                  color: colors.foreground,
+                  fontSize: 14,
+                }}
+              />
               {hasNoteChanged && (
                 <Button size="sm" onPress={handleSaveNote} className="self-end rounded-lg">
                   <ButtonIcon as={Check} />

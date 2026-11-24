@@ -64,6 +64,52 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   }
 }
 
+export async function scheduleInterviewReminder(payload: {
+  offerId: string;
+  jobTitle: string;
+  company: string;
+  triggerDate: Date;
+}): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') return null;
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('job-alerts', {
+        name: 'Alertes emploi Jobma',
+        importance: Notifications.AndroidImportance.HIGH,
+      });
+    }
+
+    const seconds = Math.max(
+      10,
+      Math.floor((payload.triggerDate.getTime() - Date.now()) / 1000)
+    );
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `Entretien chez ${payload.company}`,
+        body: `Préparez votre entretien pour « ${payload.jobTitle} ».`,
+        data: { offerId: payload.offerId },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds,
+      },
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
 export async function unregisterPushToken(token: string): Promise<void> {
   try {
     await authenticatedFetch('/api/v1/profile/push-token', {

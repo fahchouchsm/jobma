@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
 import {
   CheckCircle2,
@@ -37,6 +37,7 @@ function formatBytes(bytes?: number): string {
 export function StepCv({ profile, onChange }: StepCvProps) {
   const { uploadCv, removeCv } = useProfile();
   const [isPicking, setIsPicking] = useState(false);
+  const portfolioRef = useRef<{ focus: () => void } | null>(null);
 
   const handlePickCv = async () => {
     try {
@@ -189,7 +190,16 @@ export function StepCv({ profile, onChange }: StepCvProps) {
               onChangeText={(linkedinUrl) => onChange({ linkedinUrl })}
               placeholder="https://linkedin.com/in/..."
               autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
               keyboardType="url"
+              inputMode="url"
+              autoComplete="url"
+              textContentType="URL"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => portfolioRef.current?.focus()}
               className="text-foreground text-sm"
             />
           </Input>
@@ -204,11 +214,19 @@ export function StepCv({ profile, onChange }: StepCvProps) {
               <InputIcon as={Globe} className="text-muted-foreground" />
             </InputSlot>
             <InputField
+              ref={portfolioRef as never}
               value={profile.portfolioUrl}
               onChangeText={(portfolioUrl) => onChange({ portfolioUrl })}
               placeholder="https://portfolio.dev"
               autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
               keyboardType="url"
+              inputMode="url"
+              autoComplete="url"
+              textContentType="URL"
+              importantForAutofill="yes"
+              returnKeyType="done"
               className="text-foreground text-sm"
             />
           </Input>

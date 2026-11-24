@@ -104,6 +104,7 @@ export function OnboardingShell({
             paddingBottom: 24,
           }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>

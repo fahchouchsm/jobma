@@ -210,6 +210,7 @@ export function StepDomain({ profile, onChange }: StepDomainProps) {
             value={customSkill}
             onChangeText={setCustomSkill}
             onSubmitEditing={addCustomSkill}
+            returnKeyType="done"
             placeholder="Ajouter une compétence (ex : Next.js)"
             className="text-foreground text-sm"
           />

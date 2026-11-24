@@ -1,11 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Globe, Lock, Mail, User } from 'lucide-react-native';
+import { ArrowLeft, Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
+import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Divider } from '@/components/ui/divider';
+import { GoogleLogo } from '@/components/ui/google-logo';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -27,12 +28,15 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const emailRef = useRef<{ focus: () => void } | null>(null);
+  const passwordRef = useRef<{ focus: () => void } | null>(null);
 
   const handleAuthSuccess = useCallback(
     (res: AuthResponse) => {
-      const ready = Boolean(res.hasCompletedOnboarding && (res.isProfileComplete ?? true));
-      router.replace(ready ? '/' : '/onboarding');
+      router.replace(res.hasCompletedOnboarding ? '/' : '/onboarding');
     },
     [router]
   );
@@ -83,6 +87,7 @@ export default function RegisterScreen() {
         <ScrollView
           className="flex-1"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{
             paddingTop: Platform.OS === 'web' ? 24 : Math.max(insets.top + 12, 24),
             paddingBottom: Math.max(insets.bottom + 24, 32),
@@ -136,7 +141,14 @@ export default function RegisterScreen() {
                   <InputField
                     value={fullName}
                     onChangeText={setFullName}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    autoComplete="name"
                     textContentType="name"
+                    importantForAutofill="yes"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => emailRef.current?.focus()}
                     placeholder="Youssef Benali"
                     className="text-foreground text-sm"
                   />
@@ -152,11 +164,20 @@ export default function RegisterScreen() {
                     <InputIcon as={Mail} className="text-muted-foreground" />
                   </InputSlot>
                   <InputField
+                    ref={emailRef as never}
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
                     keyboardType="email-address"
+                    inputMode="email"
+                    autoComplete="email"
                     textContentType="emailAddress"
+                    importantForAutofill="yes"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => passwordRef.current?.focus()}
                     placeholder="vous@exemple.com"
                     className="text-foreground text-sm"
                   />
@@ -172,14 +193,26 @@ export default function RegisterScreen() {
                     <InputIcon as={Lock} className="text-muted-foreground" />
                   </InputSlot>
                   <InputField
+                    ref={passwordRef as never}
                     value={password}
                     onChangeText={setPassword}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="new-password"
                     textContentType="newPassword"
+                    importantForAutofill="yes"
+                    returnKeyType="done"
                     placeholder="Minimum 6 caractères"
                     onSubmitEditing={() => void handleRegister()}
                     className="text-foreground text-sm"
                   />
+                  <InputSlot onPress={() => setShowPassword((prev) => !prev)} className="pl-2">
+                    <InputIcon
+                      as={showPassword ? EyeOff : Eye}
+                      className="text-muted-foreground"
+                    />
+                  </InputSlot>
                 </Input>
               </VStack>
 
@@ -212,9 +245,11 @@ export default function RegisterScreen() {
               size="lg"
               isDisabled={isAuthLoading || !isGoogleReady}
               onPress={handleGooglePress}
-              className="h-12 rounded-xl">
-              <ButtonIcon as={Globe} />
-              <ButtonText className="font-semibold">Continuer avec Google</ButtonText>
+              className="bg-card border-border h-12 gap-3 rounded-xl">
+              <GoogleLogo size={20} />
+              <ButtonText className="text-foreground font-semibold">
+                Continuer avec Google
+              </ButtonText>
             </Button>
 
             <HStack className="mt-auto items-center justify-center pt-6" space="xs">

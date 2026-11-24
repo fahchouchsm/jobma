@@ -1,11 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Globe, Lock, Mail } from 'lucide-react-native';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
+import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Divider } from '@/components/ui/divider';
+import { GoogleLogo } from '@/components/ui/google-logo';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
@@ -25,12 +26,14 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const passwordRef = useRef<{ focus: () => void } | null>(null);
 
   const handleAuthSuccess = useCallback(
     (res: AuthResponse) => {
-      const ready = Boolean(res.hasCompletedOnboarding && (res.isProfileComplete ?? true));
-      router.replace(ready ? '/' : '/onboarding');
+      router.replace(res.hasCompletedOnboarding ? '/' : '/onboarding');
     },
     [router]
   );
@@ -72,6 +75,7 @@ export default function LoginScreen() {
         <ScrollView
           className="flex-1"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{
             paddingTop: Platform.OS === 'web' ? 24 : Math.max(insets.top + 12, 24),
             paddingBottom: Math.max(insets.bottom + 24, 32),
@@ -115,8 +119,16 @@ export default function LoginScreen() {
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
                     keyboardType="email-address"
+                    inputMode="email"
+                    autoComplete="email"
                     textContentType="emailAddress"
+                    importantForAutofill="yes"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => passwordRef.current?.focus()}
                     placeholder="vous@exemple.com"
                     className="text-foreground text-sm"
                   />
@@ -139,14 +151,26 @@ export default function LoginScreen() {
                     <InputIcon as={Lock} className="text-muted-foreground" />
                   </InputSlot>
                   <InputField
+                    ref={passwordRef as never}
                     value={password}
                     onChangeText={setPassword}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="current-password"
                     textContentType="password"
+                    importantForAutofill="yes"
+                    returnKeyType="done"
                     placeholder="••••••••"
                     onSubmitEditing={() => void handleLogin()}
                     className="text-foreground text-sm"
                   />
+                  <InputSlot onPress={() => setShowPassword((prev) => !prev)} className="pl-2">
+                    <InputIcon
+                      as={showPassword ? EyeOff : Eye}
+                      className="text-muted-foreground"
+                    />
+                  </InputSlot>
                 </Input>
               </VStack>
 
@@ -179,9 +203,11 @@ export default function LoginScreen() {
               size="lg"
               isDisabled={isAuthLoading || !isGoogleReady}
               onPress={handleGooglePress}
-              className="h-12 rounded-xl">
-              <ButtonIcon as={Globe} />
-              <ButtonText className="font-semibold">Continuer avec Google</ButtonText>
+              className="bg-card border-border h-12 gap-3 rounded-xl">
+              <GoogleLogo size={20} />
+              <ButtonText className="text-foreground font-semibold">
+                Continuer avec Google
+              </ButtonText>
             </Button>
 
             <HStack className="mt-auto items-center justify-center pt-6" space="xs">
