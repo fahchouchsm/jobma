@@ -36,8 +36,7 @@ All `400` validation errors return structured field-level errors:
   "error": "validation_error",
   "message": "Please complete all required profile fields",
   "fieldErrors": {
-    "phone": "Required to complete onboarding",
-    "headline": "Required to complete onboarding"
+    "domains": "Required to complete onboarding"
   }
 }
 ```
