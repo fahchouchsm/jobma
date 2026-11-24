@@ -1,21 +1,22 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Globe, Lock, Mail } from 'lucide-react-native';
+import { Globe, Lock, Mail } from 'lucide-react-native';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Divider } from '@/components/ui/divider';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
-import { Icon } from '@/components/ui/icon';
 import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import { Pressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useAuth } from '@/context/auth-context';
+import { useGoogleAuth } from '@/hooks/use-google-auth';
 import { triggerHaptic } from '@/lib/haptics';
+import type { AuthResponse } from '@/services/auth-service';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -26,10 +27,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const errorMessage = localError || authError;
+  const handleAuthSuccess = useCallback(
+    (res: AuthResponse) => {
+      const ready = Boolean(res.hasCompletedOnboarding && (res.isProfileComplete ?? true));
+      router.replace(ready ? '/' : '/onboarding');
+    },
+    [router]
+  );
+
+  const { isGoogleReady, googleError, clearGoogleError, promptGoogleSignIn } =
+    useGoogleAuth(handleAuthSuccess);
+
+  const errorMessage = localError || googleError || authError;
 
   const handleLogin = async () => {
     setLocalError(null);
+    clearGoogleError();
     clearAuthError();
     if (!email.trim() || !password) {
       setLocalError('Veuillez renseigner votre email et votre mot de passe.');
@@ -39,16 +52,16 @@ export default function LoginScreen() {
       triggerHaptic('light');
       const res = await login(email, password);
       triggerHaptic('success');
-      router.replace(res.hasCompletedOnboarding ? '/' : '/onboarding');
+      handleAuthSuccess(res);
     } catch {
       // authError set by AuthContext
     }
   };
 
   const handleGooglePress = () => {
-    setLocalError(
-      'Configurez EXPO_PUBLIC_GOOGLE_CLIENT_ID avec expo-auth-session pour activer Google Sign-In.'
-    );
+    setLocalError(null);
+    clearAuthError();
+    void promptGoogleSignIn();
   };
 
   return (
@@ -66,22 +79,7 @@ export default function LoginScreen() {
             flexGrow: 1,
           }}>
           <VStack space="lg" className="flex-1">
-            <HStack className="items-center justify-between">
-              <Pressable
-                accessibilityLabel="Retour"
-                onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-                className="bg-muted h-10 w-10 items-center justify-center rounded-full">
-                <Icon as={ArrowLeft} size="md" className="text-foreground" />
-              </Pressable>
-
-              <Pressable onPress={() => router.replace('/')}>
-                <Text size="xs" bold className="text-muted-foreground">
-                  Continuer sans compte
-                </Text>
-              </Pressable>
-            </HStack>
-
-            <VStack space="xs" className="pt-2">
+            <VStack space="xs" className="pt-6">
               <Text size="2xl" bold className="text-foreground tracking-tight">
                 jobma
                 <Text size="2xl" bold className="text-primary">
@@ -126,9 +124,16 @@ export default function LoginScreen() {
               </VStack>
 
               <VStack space="xs">
-                <Text size="xs" bold className="text-foreground">
-                  Mot de passe
-                </Text>
+                <HStack className="items-center justify-between">
+                  <Text size="xs" bold className="text-foreground">
+                    Mot de passe
+                  </Text>
+                  <Pressable onPress={() => router.push('/auth/forgot-password')}>
+                    <Text size="xs" bold className="text-primary">
+                      Mot de passe oublié ?
+                    </Text>
+                  </Pressable>
+                </HStack>
                 <Input className="bg-card border-border h-12 rounded-xl px-3">
                   <InputSlot className="pr-2">
                     <InputIcon as={Lock} className="text-muted-foreground" />
@@ -172,7 +177,7 @@ export default function LoginScreen() {
             <Button
               variant="outline"
               size="lg"
-              isDisabled={isAuthLoading}
+              isDisabled={isAuthLoading || !isGoogleReady}
               onPress={handleGooglePress}
               className="h-12 rounded-xl">
               <ButtonIcon as={Globe} />

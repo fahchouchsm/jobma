@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
@@ -8,6 +9,7 @@ import {
   Bell,
   Bookmark,
   Briefcase,
+  Camera,
   CheckCircle2,
   Eye,
   FileText,
@@ -43,7 +45,6 @@ import { EditProfileSheet } from '@/components/profile/edit-profile-sheet';
 import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
 import { useProfile } from '@/context/profile-context';
-import { USER_PROFILE_AVATAR } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 
 function SettingToggleRow({
@@ -90,21 +91,28 @@ function SettingToggleRow({
 export default function ProfileScreen() {
   const router = useRouter();
   const { theme } = useUniwind();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, deleteAccount } = useAuth();
   const { savedIds, appliedIds } = useJobs();
   const {
     profile,
+    cvFiles,
     settings,
     savedAlerts,
     isUploadingCv,
-    updateProfile,
+    isUploadingAvatar,
+    saveProfile,
     updateSettings,
     uploadCv,
     removeCv,
+    selectPrimaryCv,
+    removeJobAlert,
+    uploadAvatar,
     resetOnboarding,
   } = useProfile();
   const isDark = theme === 'dark';
   const [showEditProfile, setShowEditProfile] = useState(false);
+
+  const avatarUri = user?.avatarUrl || profile.avatarUrl;
 
   const initials = (profile.fullName || 'JM')
     .split(' ')
@@ -153,6 +161,48 @@ export default function ProfileScreen() {
         // Handled silently or retryable
       }
     }
+  };
+
+  const handlePickAvatar = async () => {
+    if (!isAuthenticated || isUploadingAvatar) return;
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/jpeg', 'image/png', 'image/webp'],
+      copyToCacheDirectory: true,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      try {
+        await uploadAvatar({
+          uri: asset.uri,
+          name: asset.name || 'avatar.jpg',
+          mimeType: asset.mimeType || 'image/jpeg',
+        });
+        triggerHaptic('success');
+      } catch {
+        // Ignore upload error silently or allow retry
+      }
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Supprimer mon compte',
+      'Cette action est irréversible et supprimera votre profil, vos CV, vos favoris, vos candidatures et vos alertes.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            void deleteAccount()
+              .then(() => {
+                router.replace('/auth/login');
+              })
+              .catch(() => {});
+          },
+        },
+      ]
+    );
   };
 
   const handleRelaunchOnboarding = async () => {
@@ -220,10 +270,18 @@ export default function ProfileScreen() {
             <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
               <VStack space="md">
                 <HStack className="items-center" space="md">
-                  <Avatar className="border-primary/20 h-16 w-16 border-2">
-                    <AvatarFallbackText>{initials}</AvatarFallbackText>
-                    <AvatarImage source={{ uri: USER_PROFILE_AVATAR }} />
-                  </Avatar>
+                  <Pressable
+                    accessibilityLabel="Changer la photo de profil"
+                    onPress={() => void handlePickAvatar()}
+                    className="relative">
+                    <Avatar className="border-primary/20 h-16 w-16 border-2">
+                      <AvatarFallbackText>{initials}</AvatarFallbackText>
+                      {avatarUri ? <AvatarImage source={{ uri: avatarUri }} /> : null}
+                    </Avatar>
+                    <Box className="bg-primary border-card absolute -right-0.5 -bottom-0.5 h-6 w-6 items-center justify-center rounded-full border-2">
+                      <Icon as={Camera} size="2xs" className="text-primary-foreground" />
+                    </Box>
+                  </Pressable>
                   <VStack space="xs" className="min-w-0 flex-1">
                     <Heading size="lg" bold className="text-foreground">
                       {profile.fullName}
@@ -297,48 +355,81 @@ export default function ProfileScreen() {
               </VStack>
             </Card>
 
-            {/* CV Card */}
+            {/* CV Card (Multi-CV) */}
             <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
               <VStack space="sm">
                 <HStack className="items-center justify-between">
                   <HStack className="items-center" space="xs">
                     <Icon as={FileText} size="sm" className="text-primary" />
                     <Heading size="sm" bold className="text-foreground">
-                      Mon CV
+                      Mes CV ({cvFiles.length || (profile.cvFile ? 1 : 0)})
                     </Heading>
                   </HStack>
-                  <Pressable onPress={handlePickCv}>
+                  <Pressable onPress={handlePickCv} disabled={isUploadingCv}>
                     <Text size="xs" bold className="text-primary">
-                      {profile.cvFile ? 'Remplacer' : 'Importer'}
+                      {isUploadingCv ? 'Envoi...' : '+ Ajouter'}
                     </Text>
                   </Pressable>
                 </HStack>
 
-                {profile.cvFile ? (
-                  <HStack className="bg-muted items-center rounded-xl p-3" space="sm">
-                    <Icon as={FileText} size="md" className="text-secondary shrink-0" />
-                    <VStack className="min-w-0 flex-1">
-                      <Text size="xs" bold isTruncated className="text-foreground">
-                        {profile.cvFile.name}
-                      </Text>
-                      <Text size="2xs" className="text-muted-foreground">
-                        {isUploadingCv
-                          ? 'Envoi vers le cloud...'
-                          : isAuthenticated
-                            ? 'Synchronisé dans le cloud'
-                            : 'Utilisé automatiquement pour 1-clic'}
-                      </Text>
-                    </VStack>
-                    <Pressable
-                      accessibilityLabel="Supprimer le CV"
-                      onPress={() => {
-                        triggerHaptic('light');
-                        void removeCv();
-                      }}
-                      className="p-1.5">
-                      <Icon as={Trash2} size="sm" className="text-destructive" />
-                    </Pressable>
-                  </HStack>
+                {(cvFiles.length > 0 ? cvFiles : profile.cvFile ? [profile.cvFile] : []).length >
+                0 ? (
+                  <VStack space="xs">
+                    {(cvFiles.length > 0 ? cvFiles : profile.cvFile ? [profile.cvFile] : []).map(
+                      (cv) => {
+                        const isPrimary =
+                          cv.isPrimary ||
+                          (profile.cvFile?.id
+                            ? cv.id === profile.cvFile.id
+                            : cv.name === profile.cvFile?.name);
+                        return (
+                          <HStack
+                            key={cv.id ?? cv.name}
+                            className={`items-center rounded-xl border p-3 ${
+                              isPrimary
+                                ? 'bg-secondary-container/40 border-secondary/40'
+                                : 'bg-muted border-transparent'
+                            }`}
+                            space="sm">
+                            <Pressable
+                              onPress={() => {
+                                if (cv.id && !isPrimary) {
+                                  triggerHaptic('light');
+                                  void selectPrimaryCv(cv.id);
+                                }
+                              }}
+                              className="min-w-0 flex-1 flex-row items-center gap-2.5">
+                              <Icon
+                                as={FileText}
+                                size="md"
+                                className={isPrimary ? 'text-secondary shrink-0' : 'text-muted-foreground shrink-0'}
+                              />
+                              <VStack className="min-w-0 flex-1">
+                                <Text size="xs" bold isTruncated className="text-foreground">
+                                  {cv.name}
+                                </Text>
+                                <Text size="2xs" className="text-muted-foreground">
+                                  {isPrimary
+                                    ? 'CV principal (1-clic)'
+                                    : 'Appuyer pour définir comme principal'}
+                                </Text>
+                              </VStack>
+                            </Pressable>
+
+                            <Pressable
+                              accessibilityLabel="Supprimer le CV"
+                              onPress={() => {
+                                triggerHaptic('light');
+                                void removeCv(cv.id);
+                              }}
+                              className="p-1.5">
+                              <Icon as={Trash2} size="sm" className="text-destructive" />
+                            </Pressable>
+                          </HStack>
+                        );
+                      }
+                    )}
+                  </VStack>
                 ) : (
                   <Button
                     variant="outline"
@@ -353,6 +444,61 @@ export default function ProfileScreen() {
                 )}
               </VStack>
             </Card>
+
+            {/* Saved Job Alerts (Interactive) */}
+            {savedAlerts.length > 0 && (
+              <Card className="bg-card border-border rounded-2xl border p-4 shadow-xs">
+                <VStack space="sm">
+                  <HStack className="items-center" space="xs">
+                    <Icon as={Bell} size="sm" className="text-primary" />
+                    <Heading size="sm" bold className="text-foreground">
+                      Mes alertes ({savedAlerts.length})
+                    </Heading>
+                  </HStack>
+
+                  <VStack space="xs">
+                    {savedAlerts.map((alert) => (
+                      <HStack
+                        key={alert.id}
+                        className="bg-muted items-center justify-between rounded-xl px-3 py-2.5"
+                        space="sm">
+                        <Pressable
+                          onPress={() => {
+                            triggerHaptic('light');
+                            router.push({
+                              pathname: '/',
+                              params: {
+                                q: alert.query,
+                                workMode: alert.workMode ?? '',
+                                minSalary: alert.minSalaryK ? String(alert.minSalaryK) : '',
+                              },
+                            });
+                          }}
+                          className="min-w-0 flex-1">
+                          <Text size="xs" bold numberOfLines={1} className="text-foreground">
+                            {alert.query}
+                          </Text>
+                          <Text size="2xs" className="text-muted-foreground">
+                            {alert.workMode ?? 'Tous modes'}
+                            {alert.minSalaryK ? ` • ${alert.minSalaryK}k+ MAD` : ''} • Voir les offres →
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          accessibilityLabel="Supprimer l'alerte"
+                          onPress={() => {
+                            triggerHaptic('light');
+                            removeJobAlert(alert.id);
+                          }}
+                          className="p-1.5">
+                          <Icon as={Trash2} size="xs" className="text-destructive" />
+                        </Pressable>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </VStack>
+              </Card>
+            )}
 
             {/* Activity Stats */}
             <HStack space="sm">
@@ -524,6 +670,17 @@ export default function ProfileScreen() {
                 <ButtonIcon as={RotateCcw} />
                 <ButtonText>Relancer l&apos;assistant de configuration</ButtonText>
               </Button>
+
+              {isAuthenticated && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={handleDeleteAccount}
+                  className="border-destructive/40 rounded-xl">
+                  <ButtonIcon as={Trash2} className="text-destructive" />
+                  <ButtonText className="text-destructive">Supprimer mon compte</ButtonText>
+                </Button>
+              )}
             </VStack>
           </VStack>
         </Animated.View>
@@ -532,7 +689,7 @@ export default function ProfileScreen() {
       <EditProfileSheet
         visible={showEditProfile}
         profile={profile}
-        onSave={updateProfile}
+        onSave={saveProfile}
         onClose={() => setShowEditProfile(false)}
       />
     </Box>

@@ -11,7 +11,8 @@ import { Text } from '@/components/ui/text';
 import { Pressable } from '@/components/ui/pressable';
 import { Icon } from '@/components/ui/icon';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
-import { USER_PROFILE_AVATAR } from '@/data/jobs';
+import { useAuth } from '@/context/auth-context';
+import { useProfile } from '@/context/profile-context';
 
 interface JobmaHeaderProps {
   title: string;
@@ -34,7 +35,19 @@ export function JobmaHeader({
 }: JobmaHeaderProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useUniwind();
+  const { user } = useAuth();
+  const { profile } = useProfile();
   const isDark = theme === 'dark';
+  const avatarUri = user?.avatarUrl || profile.avatarUrl;
+  const initials =
+    (profile.fullName || user?.fullName || 'JM')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((p) => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'JM';
 
   const content = (
     <HStack className="h-14 items-center justify-between px-3" space="xs">
@@ -89,8 +102,8 @@ export function JobmaHeader({
             onPress={onAvatarPress}
             className="pl-1 active:opacity-80">
             <Avatar className="border-primary/20 h-8 w-8 border-2">
-              <AvatarFallbackText>SM</AvatarFallbackText>
-              <AvatarImage source={{ uri: USER_PROFILE_AVATAR }} />
+              <AvatarFallbackText>{initials}</AvatarFallbackText>
+              {avatarUri ? <AvatarImage source={{ uri: avatarUri }} /> : null}
             </Avatar>
           </Pressable>
         )}

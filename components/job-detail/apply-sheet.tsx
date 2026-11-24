@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import { KeyboardAvoidingView, Linking, Modal, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Linking } from 'react-native';
 import { ExternalLink, FileText, Send, UploadCloud, X, Zap } from 'lucide-react-native';
+import { AppBottomSheet } from '@/components/ui/app-bottom-sheet';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -22,9 +22,10 @@ interface ApplySheetProps {
   visible: boolean;
   job: JobListing;
   profile: CandidateProfile;
+  cvFiles?: CvAttachment[];
   isSubmitting: boolean;
   onClose: () => void;
-  onConfirm: (note: string) => void;
+  onConfirm: (note: string, selectedCv?: CvAttachment | null) => void;
   onAttachCv?: (cv: CvAttachment) => void;
   sourceSite?: string;
   sourceUrl?: string;
@@ -34,6 +35,7 @@ export function ApplySheet({
   visible,
   job,
   profile,
+  cvFiles = [],
   isSubmitting,
   onClose,
   onConfirm,
@@ -41,15 +43,23 @@ export function ApplySheet({
   sourceSite,
   sourceUrl,
 }: ApplySheetProps) {
-  const insets = useSafeAreaInsets();
   const [note, setNote] = useState('');
   const [isPickingCv, setIsPickingCv] = useState(false);
+  const [selectedCvId, setSelectedCvId] = useState<string | undefined>(profile.cvFile?.id);
+
+  const availableCvs = cvFiles.length > 0 ? cvFiles : profile.cvFile ? [profile.cvFile] : [];
+  const activeCv =
+    availableCvs.find((c) => (selectedCvId ? c.id === selectedCvId : c.isPrimary)) ??
+    availableCvs[0] ??
+    profile.cvFile;
 
   useEffect(() => {
     if (!visible) {
       setNote('');
+    } else {
+      setSelectedCvId(profile.cvFile?.id);
     }
-  }, [visible]);
+  }, [visible, profile.cvFile?.id]);
 
   const handleSafeClose = () => {
     if (isSubmitting) return;
@@ -85,26 +95,13 @@ export function ApplySheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleSafeClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable
-          disabled={isSubmitting}
-          onPress={handleSafeClose}
-          className="bg-foreground/45 absolute inset-0"
-        />
-
-        <Box
-          className="bg-card border-border rounded-t-3xl border-t px-5 pt-4"
-          style={{
-            paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 20),
-          }}>
-          <VStack space="md">
-            {/* Handle */}
-            <Box className="bg-border mb-1 h-1 w-10 self-center rounded-full" />
-
-            {/* Header */}
+    <AppBottomSheet
+      visible={visible}
+      onClose={handleSafeClose}
+      disableDismiss={isSubmitting}
+      snapPoints={['62%', '88%']}>
+      <VStack space="md">
+        {/* Header */}
             <HStack className="items-start justify-between" space="sm">
               <VStack className="flex-1">
                 <HStack className="items-center" space="xs">
@@ -142,14 +139,14 @@ export function ApplySheet({
                       {profile.fullName}
                     </Text>
                     <Text size="xs" isTruncated className="text-muted-foreground">
-                      {profile.cvFile
-                        ? `CV joint : ${profile.cvFile.name}`
+                      {activeCv
+                        ? `CV joint : ${activeCv.name}`
                         : 'Profil Jobma complet (sans PDF)'}
                     </Text>
                   </VStack>
                 </HStack>
 
-                {!profile.cvFile && onAttachCv && (
+                {!activeCv && onAttachCv && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -161,6 +158,35 @@ export function ApplySheet({
                   </Button>
                 )}
               </HStack>
+
+              {availableCvs.length > 1 && (
+                <HStack className="mt-2.5 flex-wrap gap-1.5">
+                  {availableCvs.map((cv) => {
+                    const selected = activeCv?.id ? cv.id === activeCv.id : cv.name === activeCv?.name;
+                    return (
+                      <Pressable
+                        key={cv.id ?? cv.name}
+                        onPress={() => {
+                          triggerHaptic('light');
+                          setSelectedCvId(cv.id);
+                        }}
+                        className={`rounded-full border px-2.5 py-1 ${
+                          selected
+                            ? 'bg-primary-fixed border-primary'
+                            : 'bg-card border-border'
+                        }`}>
+                        <Text
+                          size="2xs"
+                          bold={selected}
+                          numberOfLines={1}
+                          className={selected ? 'text-primary' : 'text-muted-foreground'}>
+                          {cv.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </HStack>
+              )}
             </Box>
 
             {/* Optional Note */}
@@ -201,7 +227,7 @@ export function ApplySheet({
               <Button
                 size="default"
                 isDisabled={isSubmitting}
-                onPress={() => onConfirm(note.trim())}
+                onPress={() => onConfirm(note.trim(), activeCv)}
                 className="flex-1 rounded-xl">
                 {isSubmitting ? (
                   <>
@@ -230,9 +256,7 @@ export function ApplySheet({
                 </ButtonText>
               </Button>
             )}
-          </VStack>
-        </Box>
-      </KeyboardAvoidingView>
-    </Modal>
+      </VStack>
+    </AppBottomSheet>
   );
 }

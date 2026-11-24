@@ -21,7 +21,7 @@ interface OnboardingShellProps {
   isFinalStep?: boolean;
   onBack: () => void;
   onNext: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
   children: React.ReactNode;
 }
 
@@ -73,16 +73,18 @@ export function OnboardingShell({
               </VStack>
             </HStack>
 
-            <Pressable
-              onPress={() => {
-                triggerHaptic('light');
-                onSkip();
-              }}
-              className="bg-muted rounded-full px-3 py-1.5 active:opacity-80">
-              <Text size="xs" bold className="text-muted-foreground">
-                Passer
-              </Text>
-            </Pressable>
+            {onSkip ? (
+              <Pressable
+                onPress={() => {
+                  triggerHaptic('light');
+                  onSkip();
+                }}
+                className="bg-muted rounded-full px-3 py-1.5 active:opacity-80">
+                <Text size="xs" bold className="text-muted-foreground">
+                  Passer
+                </Text>
+              </Pressable>
+            ) : null}
           </HStack>
 
           {/* Progress Bar */}

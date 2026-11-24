@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Check, ExternalLink, FileText, Trash2, X } from 'lucide-react-native';
+import { AppBottomSheet } from '@/components/ui/app-bottom-sheet';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -51,39 +50,26 @@ export function ApplicationDetailSheet({
   onWithdraw,
   onViewJob,
 }: ApplicationDetailSheetProps) {
-  const insets = useSafeAreaInsets();
   const [note, setNote] = useState('');
 
   useEffect(() => {
     setNote(application?.note ?? '');
   }, [application?.jobId, application?.note, visible]);
 
-  if (!job || !application) return null;
-
   const trimmedNote = note.trim();
-  const hasNoteChanged = trimmedNote !== (application.note ?? '');
+  const hasNoteChanged = Boolean(application) && trimmedNote !== (application?.note ?? '');
 
   const handleSaveNote = () => {
+    if (!job) return;
     triggerHaptic('success');
     onUpdateNote(job.id, trimmedNote || undefined);
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable onPress={onClose} className="bg-foreground/45 absolute inset-0" />
-
-        <Box
-          className="bg-card border-border rounded-t-3xl border-t px-5 pt-4"
-          style={{
-            paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 20),
-          }}>
-          <VStack space="md">
-            <Box className="bg-border mb-1 h-1 w-10 self-center rounded-full" />
-
-            {/* Header */}
+    <AppBottomSheet visible={visible && Boolean(job && application)} onClose={onClose} snapPoints={['68%', '90%']}>
+      {job && application ? (
+        <VStack space="md">
+          {/* Header */}
             <HStack className="items-start justify-between" space="sm">
               <VStack className="flex-1">
                 <Heading size="lg" bold className="text-foreground">
@@ -213,9 +199,8 @@ export function ApplicationDetailSheet({
                 <ButtonText className="font-bold">Voir l'offre</ButtonText>
               </Button>
             </HStack>
-          </VStack>
-        </Box>
-      </KeyboardAvoidingView>
-    </Modal>
+        </VStack>
+      ) : null}
+    </AppBottomSheet>
   );
 }

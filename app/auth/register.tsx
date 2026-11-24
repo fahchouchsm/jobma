@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,9 @@ import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useAuth } from '@/context/auth-context';
+import { useGoogleAuth } from '@/hooks/use-google-auth';
 import { triggerHaptic } from '@/lib/haptics';
+import type { AuthResponse } from '@/services/auth-service';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -27,10 +29,22 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const errorMessage = localError || authError;
+  const handleAuthSuccess = useCallback(
+    (res: AuthResponse) => {
+      const ready = Boolean(res.hasCompletedOnboarding && (res.isProfileComplete ?? true));
+      router.replace(ready ? '/' : '/onboarding');
+    },
+    [router]
+  );
+
+  const { isGoogleReady, googleError, clearGoogleError, promptGoogleSignIn } =
+    useGoogleAuth(handleAuthSuccess);
+
+  const errorMessage = localError || googleError || authError;
 
   const handleRegister = async () => {
     setLocalError(null);
+    clearGoogleError();
     clearAuthError();
     if (fullName.trim().length < 2) {
       setLocalError('Veuillez renseigner votre nom complet.');
@@ -49,16 +63,16 @@ export default function RegisterScreen() {
       triggerHaptic('light');
       const res = await register(fullName, email, password);
       triggerHaptic('success');
-      router.replace(res.hasCompletedOnboarding ? '/' : '/onboarding');
+      handleAuthSuccess(res);
     } catch {
       // authError set by AuthContext
     }
   };
 
   const handleGooglePress = () => {
-    setLocalError(
-      'Configurez EXPO_PUBLIC_GOOGLE_CLIENT_ID avec expo-auth-session pour activer Google Sign-In.'
-    );
+    setLocalError(null);
+    clearAuthError();
+    void promptGoogleSignIn();
   };
 
   return (
@@ -79,15 +93,11 @@ export default function RegisterScreen() {
             <HStack className="items-center justify-between">
               <Pressable
                 accessibilityLabel="Retour"
-                onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+                onPress={() =>
+                  router.canGoBack() ? router.back() : router.replace('/auth/login')
+                }
                 className="bg-muted h-10 w-10 items-center justify-center rounded-full">
                 <Icon as={ArrowLeft} size="md" className="text-foreground" />
-              </Pressable>
-
-              <Pressable onPress={() => router.replace('/')}>
-                <Text size="xs" bold className="text-muted-foreground">
-                  Continuer sans compte
-                </Text>
               </Pressable>
             </HStack>
 
@@ -200,7 +210,7 @@ export default function RegisterScreen() {
             <Button
               variant="outline"
               size="lg"
-              isDisabled={isAuthLoading}
+              isDisabled={isAuthLoading || !isGoogleReady}
               onPress={handleGooglePress}
               className="h-12 rounded-xl">
               <ButtonIcon as={Globe} />

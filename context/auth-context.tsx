@@ -2,10 +2,12 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import {
   type AuthResponse,
   type AuthUser,
+  deleteAccountOnServer,
   fetchCurrentUser,
   loginWithEmail,
   loginWithGoogle,
   logoutFromServer,
+  type MeResponse,
   onUnauthorized,
   registerWithEmail,
 } from '@/services/auth-service';
@@ -17,10 +19,16 @@ interface AuthContextValue {
   isAuthLoading: boolean;
   authError: string | null;
   lastAuthResponse: AuthResponse | null;
+  meMeta: Pick<
+    MeResponse,
+    'hasCompletedOnboarding' | 'isProfileComplete' | 'missingProfileFields'
+  > | null;
   login: (email: string, password: string) => Promise<AuthResponse>;
   register: (fullName: string, email: string, password: string) => Promise<AuthResponse>;
   loginWithGoogleToken: (idToken: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  setUserAvatar: (avatarUrl: string) => void;
   clearAuthError: () => void;
 }
 
@@ -32,12 +40,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [lastAuthResponse, setLastAuthResponse] = useState<AuthResponse | null>(null);
+  const [meMeta, setMeMeta] = useState<AuthContextValue['meMeta']>(null);
 
   useEffect(() => {
     let mounted = true;
     fetchCurrentUser()
       .then((me) => {
-        if (mounted && me) setUser(me);
+        if (mounted && me) {
+          setUser(me.user);
+          setMeMeta({
+            hasCompletedOnboarding: me.hasCompletedOnboarding,
+            isProfileComplete: me.isProfileComplete,
+            missingProfileFields: me.missingProfileFields,
+          });
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -48,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (mounted) {
         setUser(null);
         setLastAuthResponse(null);
+        setMeMeta(null);
       }
     });
 
@@ -64,6 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await loginWithEmail({ email: email.trim(), password });
       setUser(res.user);
       setLastAuthResponse(res);
+      setMeMeta({
+        hasCompletedOnboarding: res.hasCompletedOnboarding,
+        isProfileComplete: res.isProfileComplete,
+        missingProfileFields: res.missingProfileFields,
+      });
       return res;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connexion impossible';
@@ -85,6 +107,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       setUser(res.user);
       setLastAuthResponse(res);
+      setMeMeta({
+        hasCompletedOnboarding: res.hasCompletedOnboarding,
+        isProfileComplete: res.isProfileComplete,
+        missingProfileFields: res.missingProfileFields,
+      });
       return res;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Inscription impossible';
@@ -102,6 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await loginWithGoogle(idToken);
       setUser(res.user);
       setLastAuthResponse(res);
+      setMeMeta({
+        hasCompletedOnboarding: res.hasCompletedOnboarding,
+        isProfileComplete: res.isProfileComplete,
+        missingProfileFields: res.missingProfileFields,
+      });
       return res;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connexion Google impossible';
@@ -116,6 +148,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await logoutFromServer();
     setUser(null);
     setLastAuthResponse(null);
+    setMeMeta(null);
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    setIsAuthLoading(true);
+    try {
+      await deleteAccountOnServer();
+      setUser(null);
+      setLastAuthResponse(null);
+      setMeMeta(null);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }, []);
+
+  const setUserAvatar = useCallback((avatarUrl: string) => {
+    setUser((prev) => (prev ? { ...prev, avatarUrl } : prev));
   }, []);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
@@ -129,10 +178,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthLoading,
         authError,
         lastAuthResponse,
+        meMeta,
         login,
         register,
         loginWithGoogleToken,
         logout,
+        deleteAccount,
+        setUserAvatar,
         clearAuthError,
       }}>
       {children}

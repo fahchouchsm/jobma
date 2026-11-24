@@ -1,14 +1,12 @@
 import React from 'react';
-import { Modal, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BellPlus, Clock, MapPin, SlidersHorizontal, Trash2, X } from 'lucide-react-native';
+import { AppBottomSheet } from '@/components/ui/app-bottom-sheet';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Pressable } from '@/components/ui/pressable';
-import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import type { JobAlert, WorkMode } from '@/context/profile-context';
@@ -41,6 +39,7 @@ interface FilterSheetProps {
   onSelectSearch: (term: string) => void;
   onClearSearches: () => void;
   onCreateAlert: () => void;
+  onApplyAlert?: (alert: JobAlert) => void;
   onRemoveAlert: (id: string) => void;
   onReset: () => void;
   onClose: () => void;
@@ -61,50 +60,38 @@ export function FilterSheet({
   onSelectSearch,
   onClearSearches,
   onCreateAlert,
+  onApplyAlert,
   onRemoveAlert,
   onReset,
   onClose,
 }: FilterSheetProps) {
-  const insets = useSafeAreaInsets();
-
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Box className="flex-1 justify-end">
-        <Pressable onPress={onClose} className="bg-foreground/45 absolute inset-0" />
+    <AppBottomSheet visible={visible} onClose={onClose} snapPoints={['65%', '90%']}>
+      <VStack space="md">
+        <HStack className="items-center justify-between">
+          <HStack className="items-center" space="xs">
+            <Icon as={SlidersHorizontal} size="sm" className="text-primary" />
+            <Heading size="md" bold className="text-foreground">
+              Filtres & Alertes
+            </Heading>
+          </HStack>
 
-        <Box
-          className="bg-card border-border max-h-[84%] rounded-t-3xl border-t px-5 pt-4"
-          style={{
-            paddingBottom: Platform.OS === 'web' ? 20 : Math.max(insets.bottom, 20),
-          }}>
-          <VStack space="md">
-            <Box className="bg-border h-1 w-10 self-center rounded-full" />
+          <HStack className="items-center" space="sm">
+            <Pressable onPress={onReset}>
+              <Text size="xs" bold className="text-primary">
+                Réinitialiser
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Fermer"
+              onPress={onClose}
+              className="bg-muted h-8 w-8 items-center justify-center rounded-full">
+              <Icon as={X} size="sm" className="text-muted-foreground" />
+            </Pressable>
+          </HStack>
+        </HStack>
 
-            <HStack className="items-center justify-between">
-              <HStack className="items-center" space="xs">
-                <Icon as={SlidersHorizontal} size="sm" className="text-primary" />
-                <Heading size="md" bold className="text-foreground">
-                  Filtres & Alertes
-                </Heading>
-              </HStack>
-
-              <HStack className="items-center" space="sm">
-                <Pressable onPress={onReset}>
-                  <Text size="xs" bold className="text-primary">
-                    Réinitialiser
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel="Fermer"
-                  onPress={onClose}
-                  className="bg-muted h-8 w-8 items-center justify-center rounded-full">
-                  <Icon as={X} size="sm" className="text-muted-foreground" />
-                </Pressable>
-              </HStack>
-            </HStack>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <VStack space="md" className="pb-2">
+        <VStack space="md" className="pb-2">
                 {/* City Filter (Morocco) */}
                 <VStack space="xs">
                   <HStack className="items-center" space="xs">
@@ -283,8 +270,14 @@ export function FilterSheet({
                     <VStack space="xs">
                       {savedAlerts.map((alert) => (
                         <Box key={alert.id} className="bg-muted rounded-xl px-3 py-2">
-                          <HStack className="items-center justify-between">
-                            <VStack className="min-w-0 flex-1">
+                          <HStack className="items-center justify-between" space="sm">
+                            <Pressable
+                              onPress={() => {
+                                triggerHaptic('light');
+                                onApplyAlert?.(alert);
+                                onClose();
+                              }}
+                              className="min-w-0 flex-1">
                               <Text size="xs" bold className="text-foreground">
                                 {alert.query}
                               </Text>
@@ -292,7 +285,7 @@ export function FilterSheet({
                                 {alert.workMode ?? 'Tous modes'}
                                 {alert.minSalaryK ? ` • ${alert.minSalaryK}k+ MAD` : ''}
                               </Text>
-                            </VStack>
+                            </Pressable>
                             <Pressable onPress={() => onRemoveAlert(alert.id)} className="p-1.5">
                               <Icon as={Trash2} size="xs" className="text-destructive" />
                             </Pressable>
@@ -302,26 +295,23 @@ export function FilterSheet({
                     </VStack>
                   </VStack>
                 )}
-              </VStack>
-            </ScrollView>
+        </VStack>
 
-            {/* Footer Buttons */}
-            <HStack space="sm">
-              <Button
-                variant="outline"
-                size="default"
-                onPress={onCreateAlert}
-                className="rounded-xl px-3">
-                <ButtonIcon as={BellPlus} />
-                <ButtonText>Alerte</ButtonText>
-              </Button>
-              <Button size="default" onPress={onClose} className="flex-1 rounded-xl">
-                <ButtonText className="font-bold">Voir les offres</ButtonText>
-              </Button>
-            </HStack>
-          </VStack>
-        </Box>
-      </Box>
-    </Modal>
+        {/* Footer Buttons */}
+        <HStack space="sm" className="pt-1">
+          <Button
+            variant="outline"
+            size="default"
+            onPress={onCreateAlert}
+            className="rounded-xl px-3">
+            <ButtonIcon as={BellPlus} />
+            <ButtonText>Alerte</ButtonText>
+          </Button>
+          <Button size="default" onPress={onClose} className="flex-1 rounded-xl">
+            <ButtonText className="font-bold">Voir les offres</ButtonText>
+          </Button>
+        </HStack>
+      </VStack>
+    </AppBottomSheet>
   );
 }

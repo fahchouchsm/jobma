@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { ActivityIndicator, Platform, RefreshControl } from 'react-native';
+import Animated, {
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowUpDown,
@@ -31,7 +36,7 @@ import { JobCard } from '@/components/job-card';
 import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
 import { useProfile, type WorkMode } from '@/context/profile-context';
-import { type JobListing, USER_PROFILE_AVATAR } from '@/data/jobs';
+import type { JobListing } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 import { computeJobMatch } from '@/lib/job-match';
 import type {
@@ -63,9 +68,14 @@ const CATEGORY_CHIPS = new Set<OfferCategory>(['Design', 'Engineering', 'Product
 
 export default function JobDiscoveryScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{
+    q?: string;
+    workMode?: string;
+    minSalary?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const {
     offers,
     totalOffers,
@@ -103,6 +113,23 @@ export default function JobDiscoveryScreen() {
   const [showFilters, setShowFilters] = useState(false);
 
   const isFirstRender = useRef(true);
+
+  // Apply alert filters when navigated from Profile alerts
+  useEffect(() => {
+    if (routeParams.q) setQuery(routeParams.q);
+    if (
+      routeParams.workMode === 'Télétravail' ||
+      routeParams.workMode === 'Hybride' ||
+      routeParams.workMode === 'Présentiel' ||
+      routeParams.workMode === 'Tous'
+    ) {
+      setWorkModeFilter(routeParams.workMode);
+    }
+    if (routeParams.minSalary) {
+      const parsed = Number.parseInt(routeParams.minSalary, 10);
+      if (!Number.isNaN(parsed)) setMinSalaryFilter(parsed);
+    }
+  }, [routeParams.q, routeParams.workMode, routeParams.minSalary]);
 
   const activeFiltersCount =
     (workModeFilter !== 'Tous' ? 1 : 0) +
@@ -285,13 +312,70 @@ export default function JobDiscoveryScreen() {
   );
 
   const topPad = Platform.OS === 'web' ? 12 : Math.max(insets.top, 12);
+  const [headerHeight, setHeaderHeight] = useState(topPad + 138);
+  const hideDistance = useSharedValue(138);
+  const headerOffset = useSharedValue(0);
+  const lastScrollY = useSharedValue(0);
+
+  useEffect(() => {
+    hideDistance.value = Math.max(headerHeight - topPad, 0);
+  }, [headerHeight, topPad, hideDistance]);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const y = event.contentOffset.y;
+      if (y <= 0) {
+        headerOffset.value = 0;
+        lastScrollY.value = 0;
+        return;
+      }
+      const diff = y - lastScrollY.value;
+      lastScrollY.value = y;
+      const next = headerOffset.value + diff;
+      const maxHide = hideDistance.value;
+      if (next < 0) {
+        headerOffset.value = 0;
+      } else if (next > maxHide) {
+        headerOffset.value = maxHide;
+      } else {
+        headerOffset.value = next;
+      }
+    },
+  });
+
+  const animatedHeaderStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -headerOffset.value }],
+  }));
 
   return (
     <Box className="bg-background flex-1">
-      {/* Single Clean Startup Header: Wordmark + City Quick-Selector + Avatar + Search + Tabs */}
+      {/* Status bar veil so scrolled cards never clash with clock/battery */}
       <Box
-        className="bg-card border-border/80 border-b"
-        style={{ paddingTop: topPad }}>
+        pointerEvents="none"
+        className="bg-card absolute top-0 right-0 left-0 z-20"
+        style={{ height: topPad }}
+      />
+
+      {/* Scroll-linked Collapsible Startup Header (moves 1:1 with finger) */}
+      <Animated.View
+        onLayout={(e) => {
+          const h = Math.round(e.nativeEvent.layout.height);
+          if (h > 0 && Math.abs(h - headerHeight) > 1) {
+            setHeaderHeight(h);
+          }
+        }}
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            paddingTop: topPad,
+          },
+          animatedHeaderStyle,
+        ]}
+        className="bg-card border-border/80 border-b">
         <VStack className="px-4 pt-1 pb-2.5" space="sm">
           {/* Row 1: Brand + Location Selector + Profile Avatar */}
           <HStack className="items-center justify-between" space="sm">
@@ -323,7 +407,9 @@ export default function JobDiscoveryScreen() {
               className="active:opacity-80">
               <Avatar className="border-border h-9 w-9 border">
                 <AvatarFallbackText>{initials}</AvatarFallbackText>
-                <AvatarImage source={{ uri: USER_PROFILE_AVATAR }} />
+                {(user?.avatarUrl || profile.avatarUrl) ? (
+                  <AvatarImage source={{ uri: user?.avatarUrl || profile.avatarUrl }} />
+                ) : null}
               </Avatar>
             </Pressable>
           </HStack>
@@ -405,17 +491,23 @@ export default function JobDiscoveryScreen() {
             );
           })}
         </ScrollView>
-      </Box>
+      </Animated.View>
 
       {/* Virtualized Feed */}
-      <FlatList
+      <Animated.FlatList
         data={isLoadingOffers && offers.length === 0 ? [] : displayedJobs}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingTop: headerHeight + 12, paddingBottom: 32 }}
         refreshControl={
-          <RefreshControl refreshing={isRefreshingOffers} onRefresh={handleRefresh} />
+          <RefreshControl
+            refreshing={isRefreshingOffers}
+            onRefresh={handleRefresh}
+            progressViewOffset={headerHeight}
+          />
         }
         onEndReached={() => {
           if (hasMoreOffers && !isLoadingMoreOffers && !isLoadingOffers) {
@@ -513,6 +605,11 @@ export default function JobDiscoveryScreen() {
         onSelectSearch={setQuery}
         onClearSearches={clearRecentSearches}
         onCreateAlert={handleCreateAlert}
+        onApplyAlert={(alert) => {
+          setQuery(alert.query);
+          setWorkModeFilter(alert.workMode ?? 'Tous');
+          setMinSalaryFilter(alert.minSalaryK ?? 0);
+        }}
         onRemoveAlert={removeJobAlert}
         onReset={resetAll}
         onClose={() => setShowFilters(false)}

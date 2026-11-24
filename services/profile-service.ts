@@ -1,4 +1,8 @@
-import { authenticatedFetch } from '@/services/auth-service';
+import {
+  authenticatedFetch,
+  parseApiError,
+  resolveApiUrl,
+} from '@/services/auth-service';
 import type {
   AppSettings,
   CandidateProfile,
@@ -12,10 +16,13 @@ export interface ServerProfilePayload {
     id: string;
     email: string;
     fullName?: string;
+    avatarUrl?: string;
   };
   profile?: Partial<CandidateProfile>;
   settings?: Partial<AppSettings>;
   hasCompletedOnboarding?: boolean;
+  isProfileComplete?: boolean;
+  missingProfileFields?: string[];
   savedCount?: number;
   applicationsCount?: number;
 }
@@ -40,7 +47,11 @@ export interface TargetOffersResponse {
 export async function fetchServerProfile(): Promise<ServerProfilePayload | null> {
   const res = await authenticatedFetch('/api/v1/profile');
   if (!res.ok) return null;
-  return (await res.json()) as ServerProfilePayload;
+  const data = (await res.json()) as ServerProfilePayload;
+  if (data.user?.avatarUrl) {
+    data.user.avatarUrl = resolveApiUrl(data.user.avatarUrl);
+  }
+  return data;
 }
 
 export async function patchServerProfile(
@@ -48,14 +59,46 @@ export async function patchServerProfile(
     settings?: Partial<AppSettings>;
     hasCompletedOnboarding?: boolean;
   }
-): Promise<ServerProfilePayload | null> {
+): Promise<ServerProfilePayload> {
   const res = await authenticatedFetch('/api/v1/profile', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) return null;
-  return (await res.json()) as ServerProfilePayload;
+  if (!res.ok) {
+    throw await parseApiError(res);
+  }
+  const data = (await res.json()) as ServerProfilePayload;
+  if (data.user?.avatarUrl) {
+    data.user.avatarUrl = resolveApiUrl(data.user.avatarUrl);
+  }
+  return data;
+}
+
+export async function uploadProfileAvatar(file: {
+  uri: string;
+  name: string;
+  mimeType?: string;
+}): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: file.uri,
+    name: file.name,
+    type: file.mimeType || 'image/jpeg',
+  } as unknown as Blob);
+
+  const res = await authenticatedFetch('/api/v1/profile/avatar', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    throw await parseApiError(res);
+  }
+  const json = (await res.json()) as { avatarUrl?: string; data?: { avatarUrl?: string } };
+  const rawUrl = json.avatarUrl ?? json.data?.avatarUrl;
+  const resolved = resolveApiUrl(rawUrl);
+  if (!resolved) throw new Error('Avatar URL manquante');
+  return resolved;
 }
 
 export async function uploadProfileCv(file: {
@@ -76,7 +119,7 @@ export async function uploadProfileCv(file: {
   });
 
   if (!res.ok) {
-    throw new Error(`CV upload failed (${res.status})`);
+    throw await parseApiError(res);
   }
 
   const json = (await res.json()) as { data?: CvAttachment } & Partial<CvAttachment>;
@@ -92,8 +135,38 @@ export async function uploadProfileCv(file: {
   };
 }
 
-export async function deleteProfileCv(): Promise<void> {
+export async function fetchProfileCvs(): Promise<CvAttachment[]> {
+  const res = await authenticatedFetch('/api/v1/profile/cvs');
+  if (!res.ok) return [];
+  const json = (await res.json()) as { data?: CvAttachment[] } | CvAttachment[];
+  return Array.isArray(json) ? json : (json.data ?? []);
+}
+
+export async function setPrimaryProfileCv(cvId: string): Promise<void> {
+  await authenticatedFetch(`/api/v1/profile/cvs/${encodeURIComponent(cvId)}/primary`, {
+    method: 'PATCH',
+  });
+}
+
+export async function deleteProfileCv(cvId?: string): Promise<void> {
+  if (cvId) {
+    const res = await authenticatedFetch(`/api/v1/profile/cvs/${encodeURIComponent(cvId)}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) return;
+  }
   await authenticatedFetch('/api/v1/profile/cv', { method: 'DELETE' });
+}
+
+export async function downloadProfileCvBlob(cvId?: string): Promise<{ ok: boolean; status: number }> {
+  const path = cvId
+    ? `/api/v1/profile/cvs/${encodeURIComponent(cvId)}/download`
+    : '/api/v1/profile/cv/download';
+  let res = await authenticatedFetch(path);
+  if (!res.ok && cvId) {
+    res = await authenticatedFetch('/api/v1/profile/cv/download');
+  }
+  return { ok: res.ok, status: res.status };
 }
 
 export async function fetchTargetOffers({

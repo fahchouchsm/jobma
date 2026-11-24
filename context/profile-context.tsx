@@ -6,9 +6,12 @@ import {
   createServerAlert,
   deleteProfileCv,
   deleteServerAlert,
+  fetchProfileCvs,
   fetchServerAlerts,
   fetchServerProfile,
   patchServerProfile,
+  setPrimaryProfileCv,
+  uploadProfileAvatar,
   uploadProfileCv,
 } from '@/services/profile-service';
 
@@ -64,6 +67,7 @@ export interface CandidateProfile {
   bio?: string;
   phone?: string;
   githubUrl?: string;
+  avatarUrl?: string;
   workModes: WorkMode[];
   contractTypes: ContractType[];
   minSalaryK: number;
@@ -85,17 +89,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const DEFAULT_PROFILE: CandidateProfile = {
-  fullName: 'Sarah Martin',
-  headline: 'Senior Product Designer',
+  fullName: '',
+  headline: '',
+  phone: '',
   location: 'Casablanca, Maroc',
-  domains: ['Design'],
-  experienceLevel: 'Senior',
-  skills: ['Product Design', 'Design Systems', 'Figma', 'Prototypage'],
-  targetJobs: ['Product Designer', 'UI/UX Designer'],
-  targetCities: ['Casablanca', 'Rabat'],
-  workModes: ['Télétravail', 'Hybride'],
+  domains: ['Engineering'],
+  experienceLevel: 'Confirmé',
+  skills: [],
+  targetJobs: [],
+  targetCities: ['Casablanca'],
+  workModes: ['Hybride'],
   contractTypes: ['CDI'],
-  minSalaryK: 12,
+  minSalaryK: 0,
   availability: 'Sous 1 mois',
   cvFile: null,
   portfolioUrl: '',
@@ -105,6 +110,7 @@ export const DEFAULT_PROFILE: CandidateProfile = {
 
 interface PersistedState {
   hasCompletedOnboarding: boolean;
+  isProfileComplete: boolean;
   profile: CandidateProfile;
   settings: AppSettings;
   recentSearches: string[];
@@ -113,16 +119,28 @@ interface PersistedState {
 
 interface ProfileContextValue {
   profile: CandidateProfile;
+  cvFiles: CvAttachment[];
   settings: AppSettings;
   recentSearches: string[];
   savedAlerts: JobAlert[];
   hasCompletedOnboarding: boolean;
+  isProfileComplete: boolean;
+  missingProfileFields: string[];
   isHydrated: boolean;
   isUploadingCv: boolean;
+  isUploadingAvatar: boolean;
   updateProfile: (partial: Partial<CandidateProfile>) => void;
+  saveProfile: (partial: Partial<CandidateProfile>) => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => void;
-  uploadCv: (file: { uri: string; name: string; size?: number; mimeType?: string }) => Promise<CvAttachment>;
-  removeCv: () => Promise<void>;
+  uploadCv: (file: {
+    uri: string;
+    name: string;
+    size?: number;
+    mimeType?: string;
+  }) => Promise<CvAttachment>;
+  removeCv: (cvId?: string) => Promise<void>;
+  selectPrimaryCv: (cvId: string) => Promise<void>;
+  uploadAvatar: (file: { uri: string; name: string; mimeType?: string }) => Promise<string>;
   addRecentSearch: (term: string) => void;
   clearRecentSearches: () => void;
   addJobAlert: (alert: Omit<JobAlert, 'id' | 'createdAt'>) => void;
@@ -134,24 +152,31 @@ interface ProfileContextValue {
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, lastAuthResponse } = useAuth();
+  const { isAuthenticated, lastAuthResponse, meMeta, setUserAvatar } = useAuth();
   const [profile, setProfile] = useState<CandidateProfile>(DEFAULT_PROFILE);
+  const [cvFiles, setCvFiles] = useState<CvAttachment[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [recentSearches, setRecentSearches] = useState<string[]>([
-    'Product Designer',
+    'Développeur',
     'Télétravail',
-    'React Native',
+    'Casablanca',
   ]);
   const [savedAlerts, setSavedAlerts] = useState<JobAlert[]>([]);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
+  const [missingProfileFields, setMissingProfileFields] = useState<string[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isUploadingCv, setIsUploadingCv] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const wasAuthenticatedRef = useRef(false);
 
   const stateRef = useRef<PersistedState>({
     hasCompletedOnboarding: false,
+    isProfileComplete: false,
     profile: DEFAULT_PROFILE,
     settings: DEFAULT_SETTINGS,
-    recentSearches: ['Product Designer', 'Télétravail', 'React Native'],
+    recentSearches: ['Développeur', 'Télétravail', 'Casablanca'],
     savedAlerts: [],
   });
 
@@ -178,6 +203,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           ? { ...DEFAULT_SETTINGS, ...parsed.settings }
           : DEFAULT_SETTINGS;
         const nextCompleted = Boolean(parsed.hasCompletedOnboarding);
+        const nextComplete = Boolean(parsed.isProfileComplete);
         const nextSearches = Array.isArray(parsed.recentSearches)
           ? parsed.recentSearches
           : stateRef.current.recentSearches;
@@ -185,6 +211,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
         stateRef.current = {
           hasCompletedOnboarding: nextCompleted,
+          isProfileComplete: nextComplete,
           profile: nextProfile,
           settings: nextSettings,
           recentSearches: nextSearches,
@@ -194,6 +221,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setProfile(nextProfile);
         setSettings(nextSettings);
         setHasCompletedOnboarding(nextCompleted);
+        setIsProfileComplete(nextComplete);
         setRecentSearches(nextSearches);
         setSavedAlerts(nextAlerts);
         Uniwind.setTheme(nextSettings.themePreference);
@@ -208,27 +236,62 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Apply completeness flags from /auth/me
+  useEffect(() => {
+    if (!meMeta) return;
+    if (typeof meMeta.hasCompletedOnboarding === 'boolean') {
+      setHasCompletedOnboarding(meMeta.hasCompletedOnboarding);
+    }
+    if (typeof meMeta.isProfileComplete === 'boolean') {
+      setIsProfileComplete(meMeta.isProfileComplete);
+    }
+    if (Array.isArray(meMeta.missingProfileFields)) {
+      setMissingProfileFields(meMeta.missingProfileFields);
+    }
+  }, [meMeta]);
+
+  // Clear local cached profile on logout / account deletion
+  useEffect(() => {
+    if (wasAuthenticatedRef.current && !isAuthenticated) {
+      setProfile(DEFAULT_PROFILE);
+      setCvFiles([]);
+      setHasCompletedOnboarding(false);
+      setIsProfileComplete(false);
+      setMissingProfileFields([]);
+      setSavedAlerts([]);
+      void persistState({
+        hasCompletedOnboarding: false,
+        isProfileComplete: false,
+        profile: DEFAULT_PROFILE,
+        settings: stateRef.current.settings,
+        recentSearches: [],
+        savedAlerts: [],
+      });
+    }
+    wasAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated, persistState]);
+
   // Hydrate immediately from fresh login/register AuthResponse
   useEffect(() => {
     if (!lastAuthResponse) return;
     const nextProfile: CandidateProfile = {
-      ...stateRef.current.profile,
+      ...DEFAULT_PROFILE,
       ...(lastAuthResponse.profile ?? {}),
-      fullName:
-        lastAuthResponse.profile?.fullName ||
-        lastAuthResponse.user?.fullName ||
-        stateRef.current.profile.fullName,
+      fullName: lastAuthResponse.profile?.fullName || lastAuthResponse.user?.fullName || '',
+      avatarUrl: lastAuthResponse.user?.avatarUrl ?? lastAuthResponse.profile?.avatarUrl,
     };
     const nextSettings: AppSettings = {
       ...stateRef.current.settings,
       ...(lastAuthResponse.settings ?? {}),
     };
-    const nextCompleted =
-      lastAuthResponse.hasCompletedOnboarding ?? stateRef.current.hasCompletedOnboarding;
+    const nextCompleted = Boolean(lastAuthResponse.hasCompletedOnboarding);
+    const nextComplete = Boolean(lastAuthResponse.isProfileComplete ?? nextCompleted);
 
     setProfile(nextProfile);
     setSettings(nextSettings);
     setHasCompletedOnboarding(nextCompleted);
+    setIsProfileComplete(nextComplete);
+    setMissingProfileFields(lastAuthResponse.missingProfileFields ?? []);
     Uniwind.setTheme(nextSettings.themePreference);
 
     void persistState({
@@ -236,32 +299,50 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       profile: nextProfile,
       settings: nextSettings,
       hasCompletedOnboarding: nextCompleted,
+      isProfileComplete: nextComplete,
     });
   }, [lastAuthResponse, persistState]);
 
-  // Cloud sync profile & alerts when authenticated
+  // Cloud sync profile, CVs & alerts when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
     let mounted = true;
 
-    Promise.all([fetchServerProfile(), fetchServerAlerts()])
-      .then(([serverData, serverAlerts]) => {
+    Promise.all([fetchServerProfile(), fetchServerAlerts(), fetchProfileCvs()])
+      .then(([serverData, serverAlerts, serverCvs]) => {
         if (!mounted) return;
         let nextProfile = stateRef.current.profile;
         let nextSettings = stateRef.current.settings;
         let nextCompleted = stateRef.current.hasCompletedOnboarding;
+        let nextComplete = stateRef.current.isProfileComplete;
 
         if (serverData) {
           nextProfile = {
+            ...DEFAULT_PROFILE,
             ...nextProfile,
             ...(serverData.profile ?? {}),
             fullName:
               serverData.profile?.fullName || serverData.user?.fullName || nextProfile.fullName,
+            avatarUrl: serverData.user?.avatarUrl ?? nextProfile.avatarUrl,
           };
           nextSettings = { ...nextSettings, ...(serverData.settings ?? {}) };
           if (typeof serverData.hasCompletedOnboarding === 'boolean') {
             nextCompleted = serverData.hasCompletedOnboarding;
           }
+          if (typeof serverData.isProfileComplete === 'boolean') {
+            nextComplete = serverData.isProfileComplete;
+          }
+          if (Array.isArray(serverData.missingProfileFields)) {
+            setMissingProfileFields(serverData.missingProfileFields);
+          }
+        }
+
+        if (serverCvs.length > 0) {
+          setCvFiles(serverCvs);
+          const primary = serverCvs.find((c) => c.isPrimary) ?? serverCvs[0];
+          nextProfile = { ...nextProfile, cvFile: primary };
+        } else if (nextProfile.cvFile) {
+          setCvFiles([nextProfile.cvFile]);
         }
 
         const nextAlerts = serverAlerts.length > 0 ? serverAlerts : stateRef.current.savedAlerts;
@@ -269,6 +350,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setProfile(nextProfile);
         setSettings(nextSettings);
         setHasCompletedOnboarding(nextCompleted);
+        setIsProfileComplete(nextComplete);
         setSavedAlerts(nextAlerts);
         Uniwind.setTheme(nextSettings.themePreference);
 
@@ -277,6 +359,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           profile: nextProfile,
           settings: nextSettings,
           hasCompletedOnboarding: nextCompleted,
+          isProfileComplete: nextComplete,
           savedAlerts: nextAlerts,
         });
       })
@@ -287,13 +370,40 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, persistState]);
 
+  const saveProfile = useCallback(
+    async (partial: Partial<CandidateProfile>) => {
+      const merged = { ...stateRef.current.profile, ...partial };
+      if (isAuthenticated) {
+        const res = await patchServerProfile(partial);
+        if (typeof res.isProfileComplete === 'boolean') {
+          setIsProfileComplete(res.isProfileComplete);
+        }
+        if (Array.isArray(res.missingProfileFields)) {
+          setMissingProfileFields(res.missingProfileFields);
+        }
+      }
+      setProfile(merged);
+      await persistState({ ...stateRef.current, profile: merged });
+    },
+    [isAuthenticated, persistState]
+  );
+
   const updateProfile = useCallback(
     (partial: Partial<CandidateProfile>) => {
       setProfile((prev) => {
         const nextProfile = { ...prev, ...partial };
         void persistState({ ...stateRef.current, profile: nextProfile });
-        if (isAuthenticated) {
-          void patchServerProfile(partial).catch(() => {});
+        if (isAuthenticated && stateRef.current.hasCompletedOnboarding) {
+          void patchServerProfile(partial)
+            .then((res) => {
+              if (typeof res.isProfileComplete === 'boolean') {
+                setIsProfileComplete(res.isProfileComplete);
+              }
+              if (Array.isArray(res.missingProfileFields)) {
+                setMissingProfileFields(res.missingProfileFields);
+              }
+            })
+            .catch(() => {});
         }
         return nextProfile;
       });
@@ -338,6 +448,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           attachment = await uploadProfileCv(file);
         }
 
+        setCvFiles((prev) => {
+          const withoutDup = prev.filter(
+            (c) => (attachment.id ? c.id !== attachment.id : c.name !== attachment.name)
+          );
+          return [{ ...attachment, isPrimary: true }, ...withoutDup.map((c) => ({ ...c, isPrimary: false }))];
+        });
+
         setProfile((prev) => {
           const nextProfile = { ...prev, cvFile: attachment };
           void persistState({ ...stateRef.current, profile: nextProfile });
@@ -352,16 +469,68 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     [isAuthenticated, persistState]
   );
 
-  const removeCv = useCallback(async () => {
-    setProfile((prev) => {
-      const nextProfile = { ...prev, cvFile: null };
-      void persistState({ ...stateRef.current, profile: nextProfile });
-      return nextProfile;
-    });
-    if (isAuthenticated) {
-      await deleteProfileCv().catch(() => {});
-    }
-  }, [isAuthenticated, persistState]);
+  const removeCv = useCallback(
+    async (cvId?: string) => {
+      let nextPrimary: CvAttachment | null = null;
+      setCvFiles((prev) => {
+        const remaining = cvId ? prev.filter((c) => c.id !== cvId) : [];
+        nextPrimary = remaining[0] ?? null;
+        return remaining;
+      });
+      setProfile((prev) => {
+        const nextProfile = { ...prev, cvFile: nextPrimary };
+        void persistState({ ...stateRef.current, profile: nextProfile });
+        return nextProfile;
+      });
+      if (isAuthenticated) {
+        await deleteProfileCv(cvId).catch(() => {});
+      }
+    },
+    [isAuthenticated, persistState]
+  );
+
+  const selectPrimaryCv = useCallback(
+    async (cvId: string) => {
+      let chosen: CvAttachment | null = null;
+      setCvFiles((prev) =>
+        prev.map((c) => {
+          const isPrimary = c.id === cvId;
+          if (isPrimary) chosen = { ...c, isPrimary: true };
+          return { ...c, isPrimary };
+        })
+      );
+      if (chosen) {
+        setProfile((prev) => {
+          const nextProfile = { ...prev, cvFile: chosen };
+          void persistState({ ...stateRef.current, profile: nextProfile });
+          return nextProfile;
+        });
+      }
+      if (isAuthenticated) {
+        await setPrimaryProfileCv(cvId).catch(() => {});
+      }
+    },
+    [isAuthenticated, persistState]
+  );
+
+  const uploadAvatar = useCallback(
+    async (file: { uri: string; name: string; mimeType?: string }): Promise<string> => {
+      setIsUploadingAvatar(true);
+      try {
+        const avatarUrl = await uploadProfileAvatar(file);
+        setUserAvatar(avatarUrl);
+        setProfile((prev) => {
+          const nextProfile = { ...prev, avatarUrl };
+          void persistState({ ...stateRef.current, profile: nextProfile });
+          return nextProfile;
+        });
+        return avatarUrl;
+      } finally {
+        setIsUploadingAvatar(false);
+      }
+    },
+    [setUserAvatar, persistState]
+  );
 
   const addRecentSearch = useCallback(
     (term: string) => {
@@ -426,15 +595,32 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   );
 
   const completeOnboarding = useCallback(async () => {
-    setHasCompletedOnboarding(true);
-    await persistState({ ...stateRef.current, hasCompletedOnboarding: true });
     if (isAuthenticated) {
-      await patchServerProfile({
+      const res = await patchServerProfile({
         ...stateRef.current.profile,
         settings: stateRef.current.settings,
         hasCompletedOnboarding: true,
-      }).catch(() => {});
+      });
+      const completed = Boolean(res.hasCompletedOnboarding ?? true);
+      const complete = Boolean(res.isProfileComplete ?? true);
+      setHasCompletedOnboarding(completed);
+      setIsProfileComplete(complete);
+      setMissingProfileFields(res.missingProfileFields ?? []);
+      await persistState({
+        ...stateRef.current,
+        hasCompletedOnboarding: completed,
+        isProfileComplete: complete,
+      });
+      return;
     }
+
+    setHasCompletedOnboarding(true);
+    setIsProfileComplete(true);
+    await persistState({
+      ...stateRef.current,
+      hasCompletedOnboarding: true,
+      isProfileComplete: true,
+    });
   }, [persistState, isAuthenticated]);
 
   const resetOnboarding = useCallback(async () => {
@@ -446,16 +632,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     <ProfileContext.Provider
       value={{
         profile,
+        cvFiles,
         settings,
         recentSearches,
         savedAlerts,
         hasCompletedOnboarding,
+        isProfileComplete,
+        missingProfileFields,
         isHydrated,
         isUploadingCv,
+        isUploadingAvatar,
         updateProfile,
+        saveProfile,
         updateSettings,
         uploadCv,
         removeCv,
+        selectPrimaryCv,
+        uploadAvatar,
         addRecentSearch,
         clearRecentSearches,
         addJobAlert,

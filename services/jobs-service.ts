@@ -263,6 +263,38 @@ export async function fetchServerApplications(): Promise<ServerApplicationRecord
   return Array.isArray(json) ? json : (json.data ?? []);
 }
 
+export type ServerApplicationStatus =
+  | 'submitted'
+  | 'viewed'
+  | 'interview'
+  | 'offer'
+  | 'rejected'
+  | 'accepted'
+  | 'withdrawn';
+
+export async function updateServerApplication(
+  offerId: string,
+  payload: { status?: ServerApplicationStatus; note?: string }
+): Promise<void> {
+  const res = await authenticatedFetch(`/api/v1/applications/${encodeURIComponent(offerId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+}
+
+export async function deleteServerApplication(offerId: string): Promise<void> {
+  const res = await authenticatedFetch(`/api/v1/applications/${encodeURIComponent(offerId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+}
+
 /**
  * Submits a job application to POST /api/v1/applications when authenticated,
  * with graceful local fallback in guest mode.

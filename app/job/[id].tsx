@@ -38,7 +38,7 @@ import { type JobDetailTabId, JobSegmentedTabs } from '@/components/job-detail/j
 import { JobmaHeader } from '@/components/jobma-header';
 import { useAuth } from '@/context/auth-context';
 import { useJobs } from '@/context/jobs-context';
-import { useProfile } from '@/context/profile-context';
+import { type CvAttachment, useProfile } from '@/context/profile-context';
 import { JOBS, type JobBenefit, type JobListing, type JobQualification } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 import { computeJobMatch } from '@/lib/job-match';
@@ -66,7 +66,7 @@ export default function JobDetailScreen() {
   const { isAuthenticated } = useAuth();
   const { offers, getOfferById, ensureOfferLoaded, isSaved, isApplied, toggleSave, markApplied } =
     useJobs();
-  const { profile, uploadCv } = useProfile();
+  const { profile, cvFiles, uploadCv } = useProfile();
 
   const job = getOfferById(id) ?? offers[0] ?? JOBS[0];
   const match = computeJobMatch(job, profile);
@@ -153,29 +153,30 @@ export default function JobDetailScreen() {
     setShowApplySheet(true);
   };
 
-  const handleConfirmApply = async (note: string) => {
+  const handleConfirmApply = async (note: string, selectedCv?: CvAttachment | null) => {
     if (applied || isApplying) return;
+    const chosenCv = selectedCv ?? profile.cvFile;
     triggerHaptic('medium');
     setIsApplying(true);
     try {
       await submitApplication(
         {
           jobId: job.id,
-          cvId: profile.cvFile?.id,
-          cvName: profile.cvFile?.name,
+          cvId: chosenCv?.id,
+          cvName: chosenCv?.name,
           note: note || undefined,
         },
         isAuthenticated
       );
       setShowApplySheet(false);
       markApplied(job.id, {
-        cvName: profile.cvFile?.name,
+        cvName: chosenCv?.name,
         note: note || undefined,
       });
       triggerHaptic('success');
       showToast(
-        profile.cvFile
-          ? `Postulé avec ${profile.cvFile.name} !`
+        chosenCv
+          ? `Postulé avec ${chosenCv.name} !`
           : `Postulé ! L'équipe ${job.company} a été notifiée.`
       );
     } catch {
@@ -525,6 +526,7 @@ export default function JobDetailScreen() {
         visible={showApplySheet}
         job={job}
         profile={profile}
+        cvFiles={cvFiles}
         isSubmitting={isApplying}
         onClose={() => setShowApplySheet(false)}
         onConfirm={handleConfirmApply}

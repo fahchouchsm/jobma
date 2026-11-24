@@ -12,6 +12,7 @@ import { useAuth } from '@/context/auth-context';
 import { type JobListing } from '@/data/jobs';
 import {
   DEFAULT_PAGE_SIZE,
+  deleteServerApplication,
   fetchOfferById,
   fetchOffersBatch,
   fetchOffersPage,
@@ -20,13 +21,36 @@ import {
   fetchServerSavedOfferIds,
   readCachedOffersFeed,
   saveOfferOnServer,
+  type ServerApplicationStatus,
   unsaveOfferOnServer,
+  updateServerApplication,
 } from '@/services/jobs-service';
 import { mapOfferToJobListing } from '@/services/offer-mapper';
 import { fetchTargetOffers } from '@/services/profile-service';
 import type { OffersQueryParams } from '@/types/offer';
 
 export type ApplicationStatus = 'Envoyée' | 'En cours' | 'Entretien' | 'Offre';
+
+const UI_STATUS_TO_SERVER: Record<ApplicationStatus, ServerApplicationStatus> = {
+  Envoyée: 'submitted',
+  'En cours': 'viewed',
+  Entretien: 'interview',
+  Offre: 'offer',
+};
+
+function mapServerStatusToUi(status?: string): ApplicationStatus {
+  switch (status) {
+    case 'viewed':
+      return 'En cours';
+    case 'interview':
+      return 'Entretien';
+    case 'offer':
+    case 'accepted':
+      return 'Offre';
+    default:
+      return 'Envoyée';
+  }
+}
 
 export interface JobApplication {
   jobId: string;
@@ -269,7 +293,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
               next[item.offerId] = {
                 jobId: item.offerId,
                 appliedAt: item.appliedAt ?? item.createdAt ?? new Date().toISOString(),
-                status: (item.status as ApplicationStatus) ?? 'Envoyée',
+                status: mapServerStatusToUi(item.status),
                 cvName: item.cvName,
                 note: item.note,
               };
@@ -423,8 +447,11 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         persist(savedIds, next);
         return next;
       });
+      if (isAuthenticated) {
+        void updateServerApplication(id, { status: UI_STATUS_TO_SERVER[status] }).catch(() => {});
+      }
     },
-    [savedIds, persist]
+    [savedIds, persist, isAuthenticated]
   );
 
   const updateApplicationNote = useCallback(
@@ -439,8 +466,11 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         persist(savedIds, next);
         return next;
       });
+      if (isAuthenticated) {
+        void updateServerApplication(id, { note: note ?? '' }).catch(() => {});
+      }
     },
-    [savedIds, persist]
+    [savedIds, persist, isAuthenticated]
   );
 
   const withdrawApplication = useCallback(
@@ -451,9 +481,12 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
       delete next[id];
       setApplications(next);
       persist(savedIds, next);
+      if (isAuthenticated) {
+        void deleteServerApplication(id).catch(() => {});
+      }
       return removed;
     },
-    [applications, savedIds, persist]
+    [applications, savedIds, persist, isAuthenticated]
   );
 
   const restoreApplication = useCallback(
