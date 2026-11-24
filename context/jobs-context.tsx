@@ -23,6 +23,7 @@ interface JobsContextValue {
   toggleSave: (id: string) => boolean;
   markApplied: (id: string, details?: { cvName?: string; note?: string }) => void;
   updateApplicationStatus: (id: string, status: ApplicationStatus) => void;
+  updateApplicationNote: (id: string, note?: string) => void;
   withdrawApplication: (id: string) => void;
   isSaved: (id: string) => boolean;
   isApplied: (id: string) => boolean;
@@ -109,6 +110,22 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     [savedIds, persist]
   );
 
+  const updateApplicationNote = useCallback(
+    (id: string, note?: string) => {
+      setApplications((prev) => {
+        const existing = prev[id];
+        if (!existing) return prev;
+        const next: Record<string, JobApplication> = {
+          ...prev,
+          [id]: { ...existing, note },
+        };
+        persist(savedIds, next);
+        return next;
+      });
+    },
+    [savedIds, persist]
+  );
+
   const withdrawApplication = useCallback(
     (id: string) => {
       setApplications((prev) => {
@@ -136,6 +153,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         toggleSave,
         markApplied,
         updateApplicationStatus,
+        updateApplicationNote,
         withdrawApplication,
         isSaved,
         isApplied,

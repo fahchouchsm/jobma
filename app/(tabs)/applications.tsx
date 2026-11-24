@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { Compass, FileText, Send, Trash2 } from 'lucide-react-native';
+import { ApplicationDetailSheet } from '@/components/applications/application-detail-sheet';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
@@ -21,10 +22,23 @@ const STATUS_STAGES: ApplicationStatus[] = ['Envoyée', 'En cours', 'Entretien',
 
 export default function ApplicationsScreen() {
   const router = useRouter();
-  const { appliedIds, applications, isSaved, updateApplicationStatus, withdrawApplication } =
-    useJobs();
+  const {
+    appliedIds,
+    applications,
+    isSaved,
+    updateApplicationStatus,
+    updateApplicationNote,
+    withdrawApplication,
+  } = useJobs();
 
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'Toutes'>('Toutes');
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const selectedJob = useMemo(
+    () => (selectedJobId ? JOBS.find((item) => item.id === selectedJobId) ?? null : null),
+    [selectedJobId]
+  );
+  const selectedApplication = selectedJobId ? applications[selectedJobId] ?? null : null;
 
   const appliedJobs = useMemo(() => {
     return JOBS.filter((job) => {
@@ -175,13 +189,23 @@ export default function ApplicationsScreen() {
                             })}
                           </HStack>
 
-                          <HStack className="items-center pt-1" space="xs">
-                            <Icon as={FileText} size="xs" className="text-muted-foreground" />
-                            <Text size="2xs" isTruncated className="text-muted-foreground flex-1">
-                              {appInfo?.cvName ? `CV : ${appInfo.cvName}` : 'Profil Jobma envoyé'}
-                              {appInfo?.note ? ` • « ${appInfo.note} »` : ''}
+                          <Pressable
+                            onPress={() => {
+                              triggerHaptic('light');
+                              setSelectedJobId(job.id);
+                            }}
+                            className="flex-row items-center justify-between pt-1">
+                            <HStack className="min-w-0 flex-1 items-center" space="xs">
+                              <Icon as={FileText} size="xs" className="text-muted-foreground" />
+                              <Text size="2xs" isTruncated className="text-muted-foreground flex-1">
+                                {appInfo?.cvName ? `CV : ${appInfo.cvName}` : 'Profil Jobma envoyé'}
+                                {appInfo?.note ? ` • « ${appInfo.note} »` : ''}
+                              </Text>
+                            </HStack>
+                            <Text size="2xs" bold className="text-primary pl-2">
+                              Détails →
                             </Text>
-                          </HStack>
+                          </Pressable>
                         </VStack>
                       </Box>
                     </VStack>
@@ -192,6 +216,17 @@ export default function ApplicationsScreen() {
           )}
         </VStack>
       </ScrollView>
+
+      <ApplicationDetailSheet
+        visible={Boolean(selectedJob && selectedApplication)}
+        job={selectedJob}
+        application={selectedApplication}
+        onClose={() => setSelectedJobId(null)}
+        onUpdateStatus={updateApplicationStatus}
+        onUpdateNote={updateApplicationNote}
+        onWithdraw={withdrawApplication}
+        onViewJob={(jobId) => router.push(`/job/${jobId}`)}
+      />
     </Box>
   );
 }

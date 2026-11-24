@@ -41,6 +41,7 @@ import { useProfile } from '@/context/profile-context';
 import { JOBS, type JobBenefit, type JobQualification } from '@/data/jobs';
 import { triggerHaptic } from '@/lib/haptics';
 import { computeJobMatch } from '@/lib/job-match';
+import { submitApplication } from '@/services/jobs-service';
 
 const QUALIFICATION_ICON_MAP: Record<JobQualification['icon'], typeof Award> = {
   award: Award,
@@ -61,7 +62,7 @@ export default function JobDetailScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { isSaved, isApplied, toggleSave, markApplied } = useJobs();
-  const { profile } = useProfile();
+  const { profile, updateProfile } = useProfile();
 
   const job = JOBS.find((item) => item.id === id) ?? JOBS[0];
   const match = computeJobMatch(job, profile);
@@ -121,12 +122,16 @@ export default function JobDetailScreen() {
     setShowApplySheet(true);
   };
 
-  const handleConfirmApply = (note: string) => {
+  const handleConfirmApply = async (note: string) => {
     if (applied || isApplying) return;
     triggerHaptic('medium');
     setIsApplying(true);
-    setTimeout(() => {
-      setIsApplying(false);
+    try {
+      await submitApplication({
+        jobId: job.id,
+        cvName: profile.cvFile?.name,
+        note: note || undefined,
+      });
       setShowApplySheet(false);
       markApplied(job.id, {
         cvName: profile.cvFile?.name,
@@ -138,7 +143,11 @@ export default function JobDetailScreen() {
           ? `Postulé avec ${profile.cvFile.name} !`
           : `Postulé ! L'équipe ${job.company} a été notifiée.`
       );
-    }, 800);
+    } catch {
+      showToast("Erreur lors de l'envoi. Réessayez.");
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   return (
@@ -460,6 +469,7 @@ export default function JobDetailScreen() {
         isSubmitting={isApplying}
         onClose={() => setShowApplySheet(false)}
         onConfirm={handleConfirmApply}
+        onAttachCv={(cv) => updateProfile({ cvFile: cv })}
       />
     </Box>
   );
